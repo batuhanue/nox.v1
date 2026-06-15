@@ -1,0 +1,399 @@
+812-          NOX
+813-        </motion.h1>
+814-        <p className="text-xs uppercase tracking-[0.5em] opacity-30 mb-24 max-w-xs">
+815-          DÜNYANIN EN BASİT VE AKICI GÖREV SİSTEMİ
+816-        </p>
+817:        <button 
+818-          onClick={async () => {
+819-            triggerFeedback();
+820-            try {
+821-              await signInWithGoogle();
+822-            } catch (error: any) {
+--
+923-            )}
+924-          </div>
+925-        </div>
+926-        
+927-        <div className="flex items-center gap-1 md:gap-8 ml-2 md:ml-4 shrink-0">
+928:          <button 
+929-            onClick={() => {
+930-              triggerFeedback();
+931-              toggleSound();
+932-            }}
+933-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group"
+934-            title={isSoundEnabled ? "Sesi Kapat" : "Sesi Aç"}
+935-          >
+936-            {isSoundEnabled ? <Volume2 className="w-5 h-5 md:w-8 md:h-8 group-hover:scale-110 transition-transform" /> : <VolumeX className="w-5 h-5 md:w-8 md:h-8 opacity-50 group-hover:scale-110 transition-transform" />}
+937-          </button>
+938:          <button 
+939-            onClick={() => {
+940-              triggerFeedback();
+941-              setIsSearching(!isSearching);
+942-              if (isSearching) setSearchQuery('');
+943-            }}
+944-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group"
+945-            title="Ara"
+946-          >
+947-            <Search className="w-5 h-5 md:w-8 md:h-8 group-hover:scale-110 transition-transform" />
+948-          </button>
+949:          <button 
+950-            onClick={() => {
+951-              triggerFeedback();
+952-              setIsQuickAddOpen(true);
+953-            }}
+954-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group text-amber-400"
+955-            title="Hızlı Görev Ekle"
+956-          >
+957-            <Zap className="w-5 h-5 md:w-8 md:h-8 group-hover:scale-110 group-hover:rotate-12 transition-all fill-amber-400/10" />
+958-          </button>
+959:          <button 
+960-            onClick={() => {
+961-              triggerFeedback();
+962-              setIsAdding(true);
+963-            }}
+964-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group"
+965-          >
+966-            <Plus className="w-6 h-6 md:w-12 md:h-12 group-hover:scale-110 transition-transform" />
+967-          </button>
+968:          <button 
+969-            onClick={() => {
+970-              triggerFeedback();
+971-              setIsStatsOpen(true);
+972-            }}
+973-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group"
+974-            title="Analiz"
+975-          >
+976-            <BarChart2 className="w-5 h-5 md:w-8 md:h-8 group-hover:scale-110 transition-transform" />
+977-          </button>
+978:          <button 
+979-            onClick={() => {
+980-              triggerFeedback();
+981-              setIsSettingsOpen(true);
+982-            }}
+983-            className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center hover:opacity-50 transition-all group"
+984-            title="Ayarlar"
+985-          >
+986-            <Settings className="w-5 h-5 md:w-8 md:h-8 group-hover:scale-110 transition-transform" />
+987-          </button>
+988:          <button 
+989-            onClick={() => {
+990-              triggerFeedback();
+991-              localStorage.removeItem('google_calendar_token');
+992-              signOut(auth);
+993-            }}
+--
+1020-                    value={searchQuery}
+1021-                    onChange={(e) => setSearchQuery(e.target.value)}
+1022-                    className="w-full bg-transparent border-b border-brand-fg/20 pb-4 pl-10 md:pl-14 text-2xl md:text-4xl font-bold tracking-tighter outline-none placeholder:opacity-10"
+1023-                  />
+1024-                  {searchQuery && (
+1025:                    <button
+1026-                      onClick={() => {
+1027-                        triggerFeedback();
+1028-                        setSearchQuery('');
+1029-                      }}
+1030-                      className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:opacity-50 transition-opacity"
+--
+1038-          </AnimatePresence>
+1039-
+1040-          {/* View Toggle Tabs */}
+1041-          <div className="flex justify-between items-center border-b border-brand-fg/10 pb-4">
+1042-            <div className="flex gap-6">
+1043:              <button 
+1044-                onClick={() => {
+1045-                  triggerFeedback();
+1046-                  setIsCalendarView(false);
+1047-                }} 
+1048-                className={`pb-2 px-1 text-xs uppercase tracking-widest border-b-2 transition-all ${!isCalendarView ? 'border-brand-fg font-bold opacity-100' : 'border-transparent opacity-40 hover:opacity-75'}`}
+1049-              >
+1050-                LİSTE GÖRÜNÜMÜ
+1051-              </button>
+1052:              <button 
+1053-                onClick={() => {
+1054-                  triggerFeedback();
+1055-                  setIsCalendarView(true);
+1056-                }} 
+1057-                className={`pb-2 px-1 text-xs uppercase tracking-widest border-b-2 transition-all ${isCalendarView ? 'border-brand-fg font-bold opacity-100' : 'border-transparent opacity-40 hover:opacity-75'}`}
+--
+1059-                TAKVİM GÖRÜNÜMÜ
+1060-              </button>
+1061-            </div>
+1062-
+1063-            {!isCalendarView && (
+1064:              <button
+1065-                onClick={() => {
+1066-                  triggerFeedback();
+1067-                  setShowAllTasks(!showAllTasks);
+1068-                }}
+1069-                className={`text-[10px] uppercase tracking-wider font-mono transition-all rounded-full px-3 py-1 flex items-center gap-1.5 border ${
+--
+1084-              initial={{ opacity: 0, y: -10 }} 
+1085-              animate={{ opacity: 1, y: 0 }} 
+1086-              className="flex gap-2 overflow-x-auto snap-x py-2 -mt-4 mb-2 max-w-full" style={{ scrollbarWidth: 'none' }}
+1087-            >
+1088-              {(['all', 'high', 'medium', 'low', 'completed', 'uncompleted'] as const).map(filterItem => (
+1089:                <button
+1090-                  key={filterItem}
+1091-                  onClick={() => {
+1092-                    triggerFeedback();
+1093-                    setFilterMode(filterItem);
+1094-                  }}
+--
+1121-              animate={{ opacity: 1, y: 0 }}
+1122-              className="flex flex-col gap-6"
+1123-            >
+1124-              {/* Calendar Month Selector */}
+1125-              <div className="flex justify-between items-center bg-brand-fg/5 p-4 rounded-3xl border border-brand-fg/5">
+1126:                <button 
+1127-                  onClick={() => {
+1128-                    triggerFeedback();
+1129-                    if (calendarMonth === 0) {
+1130-                      setCalendarMonth(11);
+1131-                      setCalendarYear(y => y - 1);
+--
+1138-                  <ChevronLeft size={20} />
+1139-                </button>
+1140-                <h2 className="text-lg md:text-xl font-bold tracking-tight uppercase font-mono">
+1141-                  {new Date(calendarYear, calendarMonth).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+1142-                </h2>
+1143:                <button 
+1144-                  onClick={() => {
+1145-                    triggerFeedback();
+1146-                    if (calendarMonth === 11) {
+1147-                      setCalendarMonth(0);
+1148-                      setCalendarYear(y => y + 1);
+--
+1449-                              )}
+1450-                            </div>
+1451-                          </div>
+1452-                          
+1453-                          <div className="flex items-center gap-6 md:gap-12 pointer-events-auto">
+1454:                            <button
+1455-                              onClick={(e) => {
+1456-                                e.stopPropagation();
+1457-                                if (isDraggingRef.current) return;
+1458-                                triggerFeedback();
+1459-                                toggleTask(task.id, task.completed);
+--
+1488-                                ></motion.div>
+1489-                              )}
+1490-                            </AnimatePresence>
+1491-                            </button>
+1492-                            
+1493:                            <button
+1494-                              onClick={(e) => {
+1495-                                e.stopPropagation();
+1496-                                if (isDraggingRef.current) return;
+1497-                                triggerFeedback();
+1498-                                deleteTask(task.id, e);
+--
+1537-              className="bg-brand-bg border border-brand-fg/10 p-6 md:p-8 w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col gap-6 relative"
+1538-              onClick={e => e.stopPropagation()}
+1539-            >
+1540-              {/* Close Button */}
+1541-              <div className="absolute top-6 right-6">
+1542:                <button 
+1543-                  onClick={() => setIsQuickAddOpen(false)} 
+1544-                  className="p-2 opacity-55 hover:opacity-100 rounded-full hover:bg-brand-fg/5 transition-colors"
+1545-                >
+1546-                  <X className="w-5 h-5" />
+1547-                </button>
+--
+1575-              {/* Task Placement Toggle (Root vs. Nest) - Only visible if we are nested! */}
+1576-              {navigationStack.length > 0 && (
+1577-                <div className="flex flex-col gap-2">
+1578-                  <span className="text-xs uppercase tracking-[0.2em] opacity-40 font-mono">KONUM</span>
+1579-                  <div className="flex gap-2 p-1 bg-brand-fg/5 rounded-2xl border border-brand-fg/5">
+1580:                    <button
+1581-                      type="button"
+1582-                      onClick={() => {
+1583-                        triggerFeedback();
+1584-                        setQuickAddTargetRoot(true);
+1585-                      }}
+--
+1589-                          : 'text-brand-fg/60 hover:text-brand-fg'
+1590-                      }`}
+1591-                    >
+1592-                      Ana Ekran (Root)
+1593-                    </button>
+1594:                    <button
+1595-                      type="button"
+1596-                      onClick={() => {
+1597-                        triggerFeedback();
+1598-                        setQuickAddTargetRoot(false);
+1599-                      }}
+--
+1623-              {/* Priority Option */}
+1624-              <div className="flex flex-col gap-2">
+1625-                <span className="text-xs uppercase tracking-[0.2em] opacity-40 font-mono font-semibold">ÖNCELİK</span>
+1626-                <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+1627-                  {(['low', 'medium', 'high'] as const).map(p => (
+1628:                    <button
+1629-                      key={p}
+1630-                      onClick={() => {
+1631-                        triggerFeedback();
+1632-                        setQuickPriorityValue(p === quickPriorityValue ? null : p);
+1633-                      }}
+--
+1642-                  ))}
+1643-                </div>
+1644-              </div>
+1645-
+1646-              {/* Action Submit Button */}
+1647:              <button 
+1648-                onClick={() => {
+1649-                  triggerFeedback();
+1650-                  addQuickTask();
+1651-                }}
+1652-                disabled={!quickInputValue.trim()}
+--
+1671-          >
+1672-            <div className="flex-between items-end mb-12 md:mb-24 border-b border-brand-fg pb-4 md:pb-8 flex justify-between gap-4">
+1673-              <h1 className="text-4xl md:text-7xl font-bold tracking-tighter shrink">
+1674-                {navigationStack.length === 0 ? 'YENİ GÖREV' : 'YENİ ALT GÖREV'}
+1675-              </h1>
+1676:              <button 
+1677-                onClick={() => {
+1678-                  triggerFeedback();
+1679-                  setIsAdding(false);
+1680-                }}
+1681-                className="text-sm md:text-xl opacity-50 hover:opacity-100 uppercase tracking-widest md:mb-4 bg-brand-fg/10 px-4 py-2 rounded-full shrink-0"
+--
+1718-
+1719-              <div className="mt-4 flex flex-col md:flex-row md:items-center gap-4 border-b border-brand-fg/20 pb-4">
+1720-                <span className="text-xs uppercase tracking-[0.2em] opacity-40">ÖNCELİK</span>
+1721-                <div className="flex gap-2 flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+1722-                  {(['low', 'medium', 'high'] as const).map(p => (
+1723:                    <button
+1724-                      key={p}
+1725-                      onClick={() => {
+1726-                        triggerFeedback();
+1727-                        setPriorityValue(p === priorityValue ? null : p);
+1728-                      }}
+--
+1772-              transition={{ type: 'spring', damping: 20, stiffness: 400, mass: 0.8 }}
+1773-              className="bg-brand-bg border border-brand-fg/10 p-6 md:p-8 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col gap-4 relative"
+1774-              onClick={e => e.stopPropagation()}
+1775-            >
+1776-              <div className="absolute top-4 right-4">
+1777:                <button onClick={() => setLongPressedTask(null)} className="p-2 opacity-50 hover:opacity-100 rounded-full bg-brand-fg/5">
+1778-                  <X className="w-5 h-5" />
+1779-                </button>
+1780-              </div>
+1781-              <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-2 pr-8">{longPressedTask.title}</h3>
+1782-              <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2" style={{ scrollbarWidth: 'none' }}>
+--
+1796-
+1797-              <div className="mt-4 flex flex-col gap-3 border-t border-brand-fg/10 pt-4">
+1798-                <span className="text-xs uppercase tracking-[0.2em] opacity-40">ÖNCELİK DEĞİŞTİR</span>
+1799-                <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+1800-                  {(['low', 'medium', 'high'] as const).map(p => (
+1801:                    <button
+1802-                      key={p}
+1803-                      onClick={() => {
+1804-                        triggerFeedback();
+1805-                        const newPriority = p === longPressedTask.priority ? null : p;
+1806-                        updateTaskPriority(longPressedTask.id, newPriority);
+--
+1828-                      updateTaskDueDate(longPressedTask.id, e.target.value);
+1829-                    }}
+1830-                    className="bg-transparent text-brand-fg font-mono outline-none cursor-pointer flex-1 [color-scheme:dark] border border-brand-fg/10 rounded-xl px-3 py-2 text-sm"
+1831-                  />
+1832-                  {longPressedTask.dueDate && (
+1833:                    <button
+1834-                      onClick={() => {
+1835-                        triggerFeedback();
+1836-                        updateTaskDueDate(longPressedTask.id, '');
+1837-                      }}
+1838-                      className="text-xs uppercase tracking-widest px-3 py-2 rounded-xl border border-red-500/20 text-red-400 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+--
+1844-              </div>
+1845-
+1846-              <div className="mt-2 flex flex-col gap-3 border-t border-brand-fg/10 pt-4">
+1847-                <span className="text-xs uppercase tracking-[0.2em] opacity-40">PAYLAŞ</span>
+1848-                <div className="flex gap-2">
+1849:                  <button
+1850-                    onClick={() => handleCopyTaskText(longPressedTask)}
+1851-                    className="flex-1 flex items-center justify-center gap-2 text-xs uppercase tracking-widest px-3 py-2.5 rounded-xl border border-brand-fg/10 hover:border-brand-fg/30 transition-all font-mono text-brand-fg/70 hover:text-brand-fg"
+1852-                    title="Metni Kopyala"
+1853-                  >
+1854-                    <Copy className="w-3.5 h-3.5" /> Kopyala
+1855-                  </button>
+1856:                  <button
+1857-                    onClick={() => handleNativeShareTask(longPressedTask)}
+1858-                    className="flex-1 flex items-center justify-center gap-2 text-xs uppercase tracking-widest px-3 py-2.5 rounded-xl border border-brand-fg/10 hover:border-brand-fg/30 transition-all font-mono text-brand-fg/70 hover:text-brand-fg"
+1859-                    title="Sistem Paylaşımı"
+1860-                  >
+1861-                    <Share2 className="w-3.5 h-3.5" /> Paylaş
+--
+1883-              transition={{ type: 'spring', damping: 20, stiffness: 400, mass: 0.8 }}
+1884-              className="bg-brand-bg border border-brand-fg/10 p-6 md:p-8 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col gap-6 relative"
+1885-              onClick={e => e.stopPropagation()}
+1886-            >
+1887-              <div className="absolute top-4 right-4">
+1888:                <button onClick={() => setIsSettingsOpen(false)} className="p-2 opacity-50 hover:opacity-100 rounded-full bg-brand-fg/5">
+1889-                  <X className="w-5 h-5" />
+1890-                </button>
+1891-              </div>
+1892-              <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-2 pr-8">AYARLAR</h3>
+1893-              
+--
+1918-                  />
+1919-                </div>
+1920-
+1921-                <div className="flex items-center justify-between">
+1922-                  <span className="text-sm font-medium opacity-80">Otomatik Gündüz/Gece</span>
+1923:                  <button 
+1924-                    onClick={() => {
+1925-                      const newVal = !autoLightMode;
+1926-                      setAutoLightMode(newVal);
+1927-                      localStorage.setItem('nox_autoLight', newVal.toString());
+1928-                    }}
+--
+1932-                  </button>
+1933-                </div>
+1934-
+1935-                <div className="flex items-center justify-between mt-2 pt-4 border-t border-brand-fg/10">
+1936-                  <span className="text-sm font-medium opacity-80">Karanlık Mod (Sıfırla)</span>
+1937:                  <button
+1938-                    onClick={() => {
+1939-                      setBgColor('#000000');
+1940-                      setThemeColor('#ffffff');
+1941-                      setAutoLightMode(false);
+1942-                      localStorage.setItem('nox_bgColor', '#000000');
+--
+1983-              transition={{ type: 'spring', damping: 20, stiffness: 400, mass: 0.8 }}
+1984-              className="bg-brand-bg border border-brand-fg/10 p-6 md:p-8 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col gap-4 relative cursor-default"
+1985-              onClick={e => e.stopPropagation()}
+1986-            >
+1987-              <div className="absolute top-4 right-4">
+1988:                <button 
+1989-                  onClick={() => setLongPressedCalendarDay(null)} 
+1990-                  className="p-2 opacity-50 hover:opacity-100 rounded-full bg-brand-fg/5"
+1991-                >
+1992-                  <X className="w-5 h-5" />
+1993-                </button>
+--
+1999-              <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto pr-2" style={{ scrollbarWidth: 'none' }}>
+2000-                {longPressedCalendarDay.tasks.map(task => (
+2001-                  <div key={task.id} className="flex flex-col gap-2 p-3 bg-brand-fg/5 rounded-2xl border border-brand-fg/5 relative group">
+2002-                    <div className="flex items-center justify-between gap-3">
+2003-                      <div className="flex items-center gap-3">
+2004:                        <button
+2005-                          onClick={() => {
+2006-                            triggerFeedback();
+2007-                            toggleTask(task.id, task.completed);
+2008-                            // Also update inside longPressedCalendarDay state to render checklist check
+2009-                            setLongPressedCalendarDay(prev => {
+--
+2022-                        </button>
+2023-                        <span className={`text-sm md:text-base font-medium transition-all ${task.completed ? 'line-through opacity-40' : 'opacity-90'}`}>
+2024-                          {task.title}
+2025-                        </span>
+2026-                      </div>
+2027:                      <button
+2028-                        onClick={async (e) => {
+2029-                          e.stopPropagation();
+2030-                          triggerFeedback();
+2031-                          await deleteTask(task.id, e);
+2032-                          setLongPressedCalendarDay(prev => {

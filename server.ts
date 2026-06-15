@@ -124,8 +124,8 @@ function checkAndSendNotifications() {
   }
 }
 
-// Periodic check for upcoming deadlines
-setInterval(checkAndSendNotifications, 30 * 1000); 
+// Periodic check for upcoming deadlines (disabled as notification system was removed)
+// setInterval(checkAndSendNotifications, 30 * 1000); 
 
 
 app.get('/api/push/status', (req, res) => {

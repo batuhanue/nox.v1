@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
 import { X, TrendingUp, Award, Clock, BarChart2 } from 'lucide-react';
 import { FlatTask } from '../App';
 
@@ -70,13 +70,33 @@ export default function StatsOverlay({ isOpen, onClose, flatTasks, themeColor }:
       });
     }
 
+    const trendData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      
+      const year = d.getFullYear();
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+      
+      const dayLabel = `${d.getDate()} ${months[d.getMonth()]}`;
+      const completedOnDay = flatTasks.filter(t => t.completed && t.dueDate && t.dueDate.trim() === dateStr).length;
+      
+      trendData.push({
+        name: dayLabel,
+        'Tamamlanan': completedOnDay,
+      });
+    }
+
     return {
       total,
       completed,
       pending,
       completionRate,
       chartData,
-      densityData
+      densityData,
+      trendData
     };
   }, [flatTasks]);
 
@@ -234,6 +254,57 @@ export default function StatsOverlay({ isOpen, onClose, flatTasks, themeColor }:
                     radius={[4, 4, 0, 0]} 
                   />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Weekly Performance Trend LineChart */}
+          <div className="col-span-1 md:col-span-2 flex flex-col gap-2 border-t border-brand-fg/10 pt-6">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-400" />
+              <span className="text-xs uppercase tracking-widest opacity-50 font-semibold text-green-400">HAFTALIK TAMAMLANAN GÖREV TRENDİ (SON 7 GÜN)</span>
+            </div>
+            <div className="h-60 w-full mt-2 font-mono text-xs">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={stats.trendData}
+                  margin={{ top: 10, right: 15, left: -25, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="rgba(255,255,255,0.4)" 
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="rgba(255,255,255,0.4)" 
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'var(--bg-color, #000000)', 
+                      borderColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: '1rem',
+                      color: 'rgba(255,255,255,0.9)'
+                    }}
+                  />
+                  <Legend 
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ paddingTop: '10px' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Tamamlanan" 
+                    stroke={themeColor} 
+                    strokeWidth={3}
+                    dot={{ r: 4, stroke: themeColor, strokeWidth: 2, fill: '#111111' }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
