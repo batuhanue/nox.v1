@@ -1,0 +1,118 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTask(data) {
+      let dueDate = data.get('dueDate', null);
+      let isDueDateValid = dueDate == null || (dueDate is string && dueDate.size() <= 100);
+      let priority = data.get('priority', null);
+      let isPriorityValid = priority == null || (priority is string && priority in ['low', 'medium', 'high']);
+      let order = data.get('order', null);
+      let isOrderValid = order == null || order is int;
+      return data.title is string && data.title.size() <= 200 &&
+             data.completed is bool &&
+             data.userId == request.auth.uid &&
+             (data.parentId == null || isValidId(data.parentId)) &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             isDueDateValid &&
+             isPriorityValid &&
+             isOrderValid;
+    }
+
+    function isValidTaskUpdate(existing, incoming) {
+      let dueDate = incoming.get('dueDate', null);
+      let isDueDateValid = dueDate == null || (dueDate is string && dueDate.size() <= 100);
+      let priority = incoming.get('priority', null);
+      let isPriorityValid = priority == null || (priority is string && priority in ['low', 'medium', 'high']);
+      let order = incoming.get('order', null);
+      let isOrderValid = order == null || order is int;
+      return incoming.title is string && incoming.title.size() <= 200 &&
+             incoming.completed is bool &&
+             incoming.userId == existing.userId &&
+             incoming.parentId == existing.parentId &&
+             incoming.createdAt == existing.createdAt &&
+             incoming.updatedAt == request.time &&
+             isDueDateValid &&
+             isPriorityValid &&
+             isOrderValid;
+    }
+
+    function isValidUserSettings(data) {
+      return (data.bgColor is string && data.bgColor.size() <= 20) &&
+             (data.themeColor is string && data.themeColor.size() <= 20) &&
+             (data.autoLightMode is bool) &&
+             (data.updatedAt == request.time);
+    }
+
+    function isValidUserSettingsUpdate(existing, incoming) {
+      return (incoming.bgColor is string && incoming.bgColor.size() <= 20) &&
+             (incoming.themeColor is string && incoming.themeColor.size() <= 20) &&
+             (incoming.autoLightMode is bool) &&
+             (incoming.updatedAt == request.time);
+    }
+
+    // 1. Tasks Collection
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && isOwner(resource.data.userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && 
+                      isValidId(taskId) && 
+                      isValidTask(request.resource.data) &&
+                      (request.resource.data.parentId == null || exists(/databases/$(database)/documents/tasks/$(request.resource.data.parentId)));
+      
+      allow update: if isSignedIn() && 
+                      isOwner(resource.data.userId) &&
+                      isValidTaskUpdate(resource.data, request.resource.data) &&
+                      (
+                        // Action: Toggle completion
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completed', 'updatedAt'])) ||
+                        // Action: Edit metadata
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'dueDate', 'priority', 'updatedAt', 'order'])) ||
+                        // Action: Reorder tasks
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['order', 'updatedAt']))
+                      );
+      
+      allow delete: if isSignedIn() && isOwner(resource.data.userId);
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false; // Users shouldn't be queryable in list view
+      
+      allow create: if isSignedIn() && 
+                      isOwner(userId) &&
+                      isValidUserSettings(request.resource.data);
+      
+      allow update: if isSignedIn() && 
+                      isOwner(userId) &&
+                      isValidUserSettingsUpdate(resource.data, request.resource.data) &&
+                      (
+                        // Action: Update preferences
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bgColor', 'themeColor', 'autoLightMode', 'updatedAt']))
+                      );
+                      
+      allow delete: if false;
+    }
+  }
+}

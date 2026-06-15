@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A to-do item that can belong to a user and potentially a parent task.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The description of the task." },
+        "completed": { "type": "boolean", "description": "Whether the task is finished." },
+        "userId": { "type": "string", "description": "The UID of the owner." },
+        "parentId": { "type": "string", "description": "ID of the parent task, or null for top-level." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date", "description": "Optional due date." },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"], "description": "Optional priority level." },
+        "order": { "type": "integer", "description": "Visual sorting precedence of the task" }
+      },
+      "required": ["title", "completed", "userId", "createdAt", "updatedAt"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "Preferences for the user interface, including colors and theme.",
+      "type": "object",
+      "properties": {
+        "bgColor": { "type": "string", "description": "Background color." },
+        "themeColor": { "type": "string", "description": "Theme color for text and icons." },
+        "autoLightMode": { "type": "boolean", "description": "Whether auto light mode is enabled." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bgColor", "themeColor", "autoLightMode", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of all to-do tasks."
+    },
+    "/users/{userId}": {
+      "schema": "UserSettings",
+      "description": "User preferences and profile data."
+    }
+  }
+}
