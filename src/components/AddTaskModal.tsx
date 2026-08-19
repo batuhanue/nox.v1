@@ -45,9 +45,9 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // If file is > 500KB, alert (Storage might not be configured, using base64 as fallback)
-        if (file.size > 500 * 1024) {
-          alert(`"${file.name}" çok büyük. Lütfen 500KB'dan küçük dosyalar yükleyin.`);
+        // If file is > 20MB, alert
+        if (file.size > 20 * 1024 * 1024) {
+          alert(`"${file.name}" çok büyük. Lütfen 20MB'dan küçük dosyalar yükleyin.`);
           continue;
         }
 
@@ -65,6 +65,12 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
           });
         } catch (storageErr) {
           console.error("Storage upload failed, falling back to base64", storageErr);
+          
+          if (file.size > 500 * 1024) {
+             alert(`"${file.name}" Firebase Storage'a yüklenemedi (İzin hatası veya yapılandırma eksik). Fallback (Base64) modu ise Firestore limitleri gereği sadece 500KB altı dosyaları destekler.`);
+             continue;
+          }
+
           // Fallback to base64 if Storage rules block us
           const reader = new FileReader();
           const base64 = await new Promise<string>((resolve, reject) => {
@@ -105,12 +111,12 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
     if (!title.trim()) return;
     
     let durStr = '';
-    let finalStartTime = startTime;
-    let finalEndTime = endTime;
+    let finalStartTime: string | null = startTime;
+    let finalEndTime: string | null = endTime;
 
     if (isAllDay) {
-      finalStartTime = undefined as any;
-      finalEndTime = undefined as any;
+      finalStartTime = null;
+      finalEndTime = null;
       durStr = 'Tüm Gün';
     } else {
       // Calculate simple duration string
@@ -130,13 +136,13 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
     onAdd({
       title,
       date,
-      dueDate: dueDate || undefined,
+      dueDate: dueDate || null,
       isAllDay,
       importance,
       startTime: finalStartTime,
       endTime: finalEndTime,
       duration: durStr,
-      locationName: locationName || undefined,
+      locationName: locationName || null,
       reminders: reminder === 1 ? [] : [{ offset: reminder }],
       attachments,
       subtasks: subtasks.map(s => ({
@@ -235,9 +241,12 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
           </div>
 
           <div className="pt-2 flex items-center justify-between border-b-2 border-black/5 dark:border-white/5 pb-2">
-            <label className="text-[0.8125rem] font-bold text-black/80 dark:text-white/80">Tüm Gün</label>
+            <label id="allDayLabel" className="text-[0.8125rem] font-bold text-black/80 dark:text-white/80">Tüm Gün</label>
             <button
               type="button"
+              role="switch"
+              aria-checked={isAllDay}
+              aria-labelledby="allDayLabel"
               onClick={() => { triggerHaptic('light'); setIsAllDay(!isAllDay); }}
               className={`w-11 h-6 rounded-full transition-colors relative ${isAllDay ? 'bg-emerald-500' : 'bg-black/10 dark:bg-white/10'}`}
             >

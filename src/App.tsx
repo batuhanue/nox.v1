@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun } from "lucide-react";
 import { mockTasks, mockSchedules } from "./data";
 import { Task, DaySchedule } from "./types";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useDragControls, useReducedMotion } from "motion/react";
 import AddTaskModal from "./components/AddTaskModal";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from "firebase/auth";
@@ -47,7 +47,7 @@ function useTaskNotifications(tasks: Task[], user: User | null) {
   const subscribeToPush = async (userUid: string) => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.register('/custom-sw.js');
       console.log('Service Worker registered');
       
       const response = await fetch('/api/push/vapidPublicKey');
@@ -101,7 +101,7 @@ function useTaskNotifications(tasks: Task[], user: User | null) {
 
   // Sync tasks whenever they change
   useEffect(() => {
-    if (permission === 'granted' && user && tasks.length > 0) {
+    if (permission === 'granted' && user) {
       syncTasksToBackend(user.uid, tasks);
     }
   }, [tasks, user, permission]);
@@ -185,9 +185,34 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
         style={{ backgroundColor: task.color, minHeight: "150px", touchAction: "none", WebkitTapHighlightColor: "transparent" }}
       >
         <div className="flex justify-between items-start pointer-events-none">
-          <h4 className={`text-[1.375rem] font-semibold text-black/90 leading-[1.1] whitespace-pre-line tracking-tight ${task.completed ? 'line-through' : ''}`}>
-            {task.title}
-          </h4>
+          <div className="flex flex-col gap-1.5">
+            <h4 className={`text-[1.375rem] font-semibold text-black/90 leading-[1.1] whitespace-pre-line tracking-tight ${task.completed ? 'line-through' : ''}`}>
+              {task.title}
+            </h4>
+            {/* Importance / Due Date Indicators */}
+            {(task.importance === 'critical' || task.importance === 'important' || task.dueDate) && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                {task.importance === 'critical' && (
+                  <span className="text-[0.625rem] font-bold px-2 py-0.5 rounded-sm bg-red-500/20 text-red-900 uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                    Kritik
+                  </span>
+                )}
+                {task.importance === 'important' && (
+                  <span className="text-[0.625rem] font-bold px-2 py-0.5 rounded-sm bg-amber-500/20 text-amber-900 uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                    Önemli
+                  </span>
+                )}
+                {task.dueDate && (
+                  <span className="text-[0.625rem] font-bold px-2 py-0.5 rounded-sm bg-black/10 text-black/70 uppercase tracking-widest flex items-center gap-1">
+                    <CalendarIcon className="w-2.5 h-2.5" />
+                    Bitiş: {task.dueDate}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex flex-col items-end shrink-0 ml-4">
             <div className="flex -space-x-2 shrink-0">
               {(task.attendees || []).map((a, i) => (
@@ -694,6 +719,8 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const sheetDragControls = useDragControls();
+  const prefersReducedMotion = useReducedMotion();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   
   const [undoTask, setUndoTask] = useState<Task | null>(null);
@@ -701,17 +728,8 @@ export default function App() {
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsSearchOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Other key handlers can be added here
   }, []);
 
   useEffect(() => {
@@ -1091,6 +1109,8 @@ export default function App() {
             >
               <motion.div
                 drag="y"
+                dragListener={false}
+                dragControls={sheetDragControls}
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 1 }}
                 onDragEnd={(e, info) => {
@@ -1098,18 +1118,22 @@ export default function App() {
                     setSelectedTask(null);
                   }
                 }}
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
+                initial={prefersReducedMotion ? { opacity: 0 } : { y: "100%" }}
+                animate={prefersReducedMotion ? { opacity: 1 } : { y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { y: "100%" }}
+                transition={prefersReducedMotion ? { duration: 0.2 } : { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
                 className="w-full h-[90vh] sm:h-auto sm:max-h-[85vh] sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative overflow-y-auto"
                 style={{ backgroundColor: selectedTask.color }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-black/10 rounded-full mx-auto mb-6 cursor-grab active:cursor-grabbing sm:hidden" />
+                <div 
+                  className="w-12 h-1.5 bg-black/10 rounded-full mx-auto mb-6 cursor-grab active:cursor-grabbing sm:hidden"
+                  onPointerDown={(e) => sheetDragControls.start(e)}
+                />
                 
                 <button 
+                  aria-label="Kapat"
                   onClick={() => setSelectedTask(null)} 
                   className="absolute top-6 right-6 p-2 bg-black/10 rounded-full text-black/60 hover:text-black transition"
                 >
@@ -1241,10 +1265,8 @@ export default function App() {
                       transition={{ type: "spring", bounce: 0, duration: 0.3 }}
                       onClick={() => {
                         triggerHaptic('warning');
-                        if (window.confirm('Bu görevi silmek istediğinize emin misiniz?')) {
-                          deleteTask(selectedTask.id);
-                          setSelectedTask(null);
-                        }
+                        deleteTask(selectedTask.id);
+                        setSelectedTask(null);
                       }}
                       className="flex-1 bg-black/[0.08] text-black/80 py-3 rounded-[16px] font-semibold text-[0.9375rem]"
                       style={{ WebkitTapHighlightColor: "transparent", outline: "none" }}

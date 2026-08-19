@@ -72,6 +72,7 @@ export default function InboxView({ tasks, addTask, onTaskClick, toggleTask, del
               >
                 <div className="flex items-center gap-4">
                   <button 
+                    aria-label={`Görevi tamamla: ${task.title}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       triggerHaptic('success');
