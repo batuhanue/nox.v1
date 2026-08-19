@@ -1,92 +1,78 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, MapPin, Plus, Trash2 } from 'lucide-react';
 import { Task, SubTask } from '../types';
-import { useMapsLibrary } from '@vis.gl/react-google-maps';
 import { triggerHaptic } from '../App';
 
-export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, onAdd: (task: Partial<Task>) => void }) {
-  const [title, setTitle] = useState('');
+export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose: () => void, onAdd: (task: Partial<Task>) => void, initialTask?: Task | null }) {
+  const [title, setTitle] = useState(initialTask?.title || '');
   const [date, setDate] = useState(() => {
+    if (initialTask?.date) return initialTask.date;
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
-  const [startTime, setStartTime] = useState('12:00');
-  const [endTime, setStartTimeEnd] = useState('13:00');
+  const [startTime, setStartTime] = useState(initialTask?.startTime || '12:00');
+  const [endTime, setStartTimeEnd] = useState(initialTask?.endTime || '13:00');
   const setEndTime = (val: string) => setStartTimeEnd(val);
   
-  const [locationName, setLocationName] = useState('');
-  const [locationQuery, setLocationQuery] = useState('');
-  const [predictions, setPredictions] = useState<google.maps.places.Place[]>([]);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAllDay, setIsAllDay] = useState(initialTask?.isAllDay || false);
+  const [importance, setImportance] = useState<'normal' | 'important' | 'critical'>(initialTask?.importance || 'normal');
+  const [dueDate, setDueDate] = useState(initialTask?.dueDate || '');
   
-  const [subtasks, setSubtasks] = useState<{title: string}[]>([]);
+  const [locationName, setLocationName] = useState(initialTask?.locationName || '');
+  
+  const [subtasks, setSubtasks] = useState<{id?: string, title: string, completed?: boolean}[]>(initialTask?.subtasks || []);
   const [newSubtask, setNewSubtask] = useState('');
   
-  const placesLib = useMapsLibrary('places');
-  const inputRef = useRef<HTMLInputElement>(null);
-  
-  useEffect(() => {
-    if (!placesLib || !locationQuery.trim()) {
-      setPredictions([]);
-      setIsDropdownOpen(false);
-      return;
+  const [reminder, setReminder] = useState<number>(() => {
+    if (initialTask?.reminders && initialTask.reminders.length > 0) {
+      return initialTask.reminders[0].offset;
     }
-    
-    // Use the new Place.searchByText API to avoid legacy widget errors
-    const fetchPlaces = async () => {
-      try {
-        const { places } = await placesLib.Place.searchByText({
-          textQuery: locationQuery,
-          fields: ['displayName', 'formattedAddress'],
-          maxResultCount: 4,
-        });
-        setPredictions(places || []);
-        setIsDropdownOpen((places || []).length > 0);
-      } catch (e) {
-        console.error("Places API Search Error:", e);
-      }
-    };
-    
-    const timer = setTimeout(fetchPlaces, 350); // debounce
-    return () => clearTimeout(timer);
-  }, [locationQuery, placesLib]);
-
-  const handleSelectPlace = (place: google.maps.places.Place) => {
-    const name = place.displayName || place.formattedAddress || '';
-    setLocationName(name);
-    setLocationQuery(name); // update input visually
-    setIsDropdownOpen(false);
-  };
-
+    return -60; // 1 Hour before by default
+  });
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     
-    // Calculate simple duration string
-    const s = new Date(`1970-01-01T${startTime}:00`);
-    const eTime = new Date(`1970-01-01T${endTime}:00`);
-    let diffMins = Math.round((eTime.getTime() - s.getTime()) / 60000);
-    if (diffMins < 0) diffMins += 24 * 60;
-    
-    const h = Math.floor(diffMins / 60);
-    const m = diffMins % 60;
     let durStr = '';
-    if (h > 0) durStr += `${h} Sa `;
-    if (m > 0) durStr += `${m} Dk`;
-    if (!durStr) durStr = '0 Dk';
+    let finalStartTime = startTime;
+    let finalEndTime = endTime;
+
+    if (isAllDay) {
+      finalStartTime = undefined as any;
+      finalEndTime = undefined as any;
+      durStr = 'Tüm Gün';
+    } else {
+      // Calculate simple duration string
+      const s = new Date(`1970-01-01T${startTime}:00`);
+      const eTime = new Date(`1970-01-01T${endTime}:00`);
+      let diffMins = Math.round((eTime.getTime() - s.getTime()) / 60000);
+      if (diffMins < 0) diffMins += 24 * 60;
+      
+      const h = Math.floor(diffMins / 60);
+      const m = diffMins % 60;
+      if (h > 0) durStr += `${h} Sa `;
+      if (m > 0) durStr += `${m} Dk`;
+      if (!durStr) durStr = '0 Dk';
+      durStr = durStr.trim();
+    }
 
     onAdd({
       title,
       date,
-      startTime,
-      endTime,
-      duration: durStr.trim(),
+      dueDate: dueDate || undefined,
+      isAllDay,
+      importance,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      duration: durStr,
       locationName: locationName || undefined,
+      reminders: reminder === 1 ? [] : [{ offset: reminder }],
       subtasks: subtasks.map(s => ({
-        id: `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        id: s.id || `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         title: s.title,
-        completed: false
+        completed: s.completed || false
       }))
     });
   };
@@ -114,13 +100,13 @@ export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, 
       >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-black dark:text-white tracking-tight">Yeni Görev</h3>
-          <button onClick={onClose} className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition">
+          <button aria-label="Kapat" onClick={onClose} className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition">
             <X className="w-5 h-5" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Görev Adı</label>
+            <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Görev Adı</label>
             <input
               type="text"
               autoFocus
@@ -131,76 +117,130 @@ export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, 
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="pt-2">
+            <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-2 block">Önem Derecesi</label>
+            <div className="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl relative w-full">
+              {(['normal', 'important', 'critical'] as const).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => { triggerHaptic('light'); setImportance(lvl); }}
+                  className={`flex-1 relative py-1.5 text-[12px] font-semibold transition-colors duration-300 z-10 ${importance === lvl ? (lvl === 'critical' ? 'text-white' : 'text-black dark:text-white') : 'text-black/50 dark:text-white/50'}`}
+                >
+                  {importance === lvl && (
+                    <motion.div
+                      layoutId="importanceTab"
+                      className={`absolute inset-0 rounded-lg -z-10 shadow-sm ${lvl === 'critical' ? 'bg-red-500' : lvl === 'important' ? 'bg-orange-400' : 'bg-white dark:bg-[#2c2c2e]'}`}
+                      initial={false}
+                      transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                    />
+                  )}
+                  {lvl === 'normal' ? 'Normal' : lvl === 'important' ? 'Önemli' : 'Kritik'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-2">
             <div>
-              <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Tarih</label>
+              <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Planlanan Tarih</label>
               <input
                 type="date"
-                className="w-full text-[15px] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
+                className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Başlangıç</label>
-                <input
-                  type="time"
-                  className="w-full text-[15px] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Bitiş</label>
-                <input
-                  type="time"
-                  className="w-full text-[15px] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
+            <div>
+              <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block flex items-center justify-between">
+                <span>Son Tarih (İsteğe Bağlı)</span>
+              </label>
+              <input
+                type="date"
+                className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
             </div>
           </div>
 
+          <div className="pt-2 flex items-center justify-between border-b-2 border-black/5 dark:border-white/5 pb-2">
+            <label className="text-[0.8125rem] font-bold text-black/80 dark:text-white/80">Tüm Gün</label>
+            <button
+              type="button"
+              onClick={() => { triggerHaptic('light'); setIsAllDay(!isAllDay); }}
+              className={`w-11 h-6 rounded-full transition-colors relative ${isAllDay ? 'bg-emerald-500' : 'bg-black/10 dark:bg-white/10'}`}
+            >
+              <motion.div 
+                className="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm"
+                animate={{ x: isAllDay ? 20 : 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {!isAllDay && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="grid grid-cols-2 gap-4 overflow-hidden"
+              >
+                <div>
+                  <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Başlangıç</label>
+                  <input
+                    type="time"
+                    className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Bitiş</label>
+                  <input
+                    type="time"
+                    className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="pt-2 relative">
-            <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+            <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" /> Konum (İsteğe Bağlı)
             </label>
             <input
-              ref={inputRef}
               type="text"
-              placeholder="Google Haritalar'da ara..."
-              className="w-full text-[15px] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white placeholder-black/20 dark:placeholder-white/20"
-              value={locationQuery}
-              onChange={(e) => {
-                setLocationQuery(e.target.value);
-                if (!e.target.value) setLocationName(''); // clear on empty
-              }}
-              onFocus={() => {
-                if (predictions.length > 0) setIsDropdownOpen(true);
-              }}
+              placeholder="Konum ekle..."
+              className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white placeholder-black/20 dark:placeholder-white/20"
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
             />
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#2c2c2e] rounded-[16px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-black/[0.04] dark:border-white/[0.04] overflow-hidden z-10 flex flex-col">
-                {predictions.map((p, i) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleSelectPlace(p)}
-                    className="flex flex-col items-start p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/[0.04] dark:border-white/[0.04] last:border-b-0 text-left w-full"
-                  >
-                    <span className="font-semibold text-[14px] text-black/80 dark:text-white/80">{p.displayName}</span>
-                    <span className="text-[11px] font-medium text-black/40 dark:text-white/40 mt-0.5 line-clamp-1">{p.formattedAddress}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          </div>
+          
+          <div className="pt-2 relative">
+            <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 block">Hatırlatıcı</label>
+            <select
+              value={reminder}
+              onChange={(e) => setReminder(Number(e.target.value))}
+              className="w-full text-[0.9375rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white"
+            >
+              <option value={1}>Hiçbiri</option>
+              <option value={0}>Zamanında</option>
+              <option value={-15}>15 Dakika Önce</option>
+              <option value={-60}>1 Saat Önce</option>
+              <option value={-120}>2 Saat Önce</option>
+              <option value={-1440}>1 Gün Önce</option>
+            </select>
           </div>
           
           {/* Subtasks Section */}
           <div className="pt-2">
-            <label className="text-[11px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-2 block">Alt Görevler</label>
+            <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-2 block">Alt Görevler</label>
             <div className="space-y-2 mb-2">
               <AnimatePresence>
                 {subtasks.map((st, i) => (
@@ -211,7 +251,7 @@ export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, 
                     exit={{ opacity: 0, height: 0 }}
                     className="flex items-center justify-between bg-black/5 dark:bg-white/5 rounded-xl px-3 py-2"
                   >
-                    <span className="text-[13px] font-medium text-black/80 dark:text-white/80 line-clamp-1">{st.title}</span>
+                    <span className="text-[0.8125rem] font-medium text-black/80 dark:text-white/80 line-clamp-1">{st.title}</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -238,7 +278,7 @@ export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, 
                     handleAddSubtask();
                   }
                 }}
-                className="flex-1 text-[13px] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white placeholder-black/20 dark:placeholder-white/20"
+                className="flex-1 text-[0.8125rem] border-b-2 border-black/5 dark:border-white/5 bg-transparent py-2 focus:outline-none focus:border-black dark:focus:border-white transition-colors font-medium text-black dark:text-white placeholder-black/20 dark:placeholder-white/20"
               />
               <button
                 type="button"
@@ -256,10 +296,10 @@ export default function AddTaskModal({ onClose, onAdd }: { onClose: () => void, 
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             type="submit"
             disabled={!title.trim()}
-            className="w-full bg-black dark:bg-white text-white dark:text-black rounded-[16px] py-4 font-semibold text-[17px] disabled:opacity-30 disabled:scale-100 transition-opacity mt-6 shadow-md"
+            className="w-full bg-black dark:bg-white text-white dark:text-black rounded-[16px] py-4 font-semibold text-[1.0625rem] disabled:opacity-30 disabled:scale-100 transition-opacity mt-6 shadow-md"
             style={{ WebkitTapHighlightColor: "transparent", outline: "none" }}
           >
-            Görev Ekle
+            {initialTask ? "Kaydet" : "Görev Ekle"}
           </motion.button>
         </form>
       </motion.div>

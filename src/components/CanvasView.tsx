@@ -41,6 +41,7 @@ const TaskNode = ({ data, id }: NodeProps<Node<{ task: Task, onTaskClick: (t: Ta
       <Handle 
         type="target" 
         position={Position.Left} 
+        id="task-target"
         className={`w-4 h-4 !bg-white border-2 ${isCompleted ? '!border-emerald-500' : '!border-black/20'}`} 
       />
       
@@ -48,12 +49,45 @@ const TaskNode = ({ data, id }: NodeProps<Node<{ task: Task, onTaskClick: (t: Ta
         <h4 className={`text-lg font-semibold text-black/90 leading-[1.1] whitespace-pre-line tracking-tight ${isCompleted ? 'line-through text-emerald-900' : ''}`}>
           {task.title}
         </h4>
+        
+        {task.subtasks && task.subtasks.length > 0 && (
+          <div className="mt-2 flex flex-col gap-2">
+            {task.subtasks.map((st) => (
+              <div key={st.id} className="relative flex items-center bg-black/5 rounded-lg p-2 gap-2 pointer-events-auto cursor-default">
+                <Handle 
+                  type="target" 
+                  position={Position.Left} 
+                  id={`st-target-${st.id}`}
+                  style={{ top: '50%', left: -8, width: 12, height: 12 }}
+                  className="!bg-white border-2 !border-black/20" 
+                />
+                <div className={`w-3 h-3 shrink-0 rounded-full border-2 flex items-center justify-center ${st.completed ? 'bg-black border-black text-white' : 'border-black/30'}`} />
+                <span className={`text-[0.6875rem] font-semibold text-black/80 line-clamp-1 ${st.completed ? 'line-through opacity-50' : ''}`}>{st.title}</span>
+                <Handle 
+                  type="source" 
+                  position={Position.Right} 
+                  id={`st-source-${st.id}`}
+                  style={{ top: '50%', right: -8, width: 12, height: 12 }}
+                  className="!bg-white border-2 !border-black/20" 
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-2">
-          <span className="bg-black/20 text-black/80 text-[10px] px-3 py-1 rounded-full font-bold">
-            {task.startTime} - {task.endTime}
-          </span>
+          {!task.isAllDay && (
+            <span className="bg-black/20 text-black/80 text-[0.625rem] px-3 py-1 rounded-full font-bold">
+              {task.startTime || '-'} - {task.endTime || '-'}
+            </span>
+          )}
+          {task.isAllDay && (
+             <span className="bg-black/20 text-black/80 text-[0.625rem] px-3 py-1 rounded-full font-bold">
+               Tüm Gün
+             </span>
+          )}
           {isCompleted && (
-            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">
+            <span className="text-[0.625rem] font-bold text-emerald-700 uppercase tracking-widest ml-auto">
               Tamamlandı
             </span>
           )}
@@ -63,6 +97,7 @@ const TaskNode = ({ data, id }: NodeProps<Node<{ task: Task, onTaskClick: (t: Ta
       <Handle 
         type="source" 
         position={Position.Right} 
+        id="task-source"
         className={`w-4 h-4 !bg-white border-2 ${isCompleted ? '!border-emerald-500' : '!border-black/20'}`} 
       />
     </div>
@@ -362,7 +397,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
             
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 hide-scrollbar">
               {availableTasks.length === 0 ? (
-                <div className="text-center text-black/40 dark:text-white/40 text-[11px] mt-6 px-2">
+                <div className="text-center text-black/40 dark:text-white/40 text-[0.6875rem] mt-6 px-2">
                   Kanvasa eklenecek görev kalmadı.
                 </div>
               ) : (
@@ -392,7 +427,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
             <div className="p-3 border-t border-black/[0.05] dark:border-white/[0.05] bg-white/50 dark:bg-black/20">
               <button
                 onClick={() => { triggerHaptic('medium'); onAddRequest(); }}
-                className="w-full py-2 bg-black dark:bg-white text-white dark:text-black rounded-[12px] font-semibold text-[11px] flex items-center justify-center gap-1.5 hover:bg-black/80 dark:hover:bg-white/80 transition-colors uppercase tracking-wide"
+                className="w-full py-2 bg-black dark:bg-white text-white dark:text-black rounded-[12px] font-semibold text-[0.6875rem] flex items-center justify-center gap-1.5 hover:bg-black/80 dark:hover:bg-white/80 transition-colors uppercase tracking-wide"
               >
                 <Plus className="w-3.5 h-3.5" /> Yeni Ekle
               </button>
@@ -523,13 +558,13 @@ export default function CanvasView({ tasks, onTaskClick, onAddRequest, onClose }
           </button>
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-black dark:text-white">Projeler</h1>
-            <p className="text-black/50 dark:text-white/50 text-[15px] mt-1 font-medium">Kanvas akışlarınızı proje bazlı yönetin.</p>
+            <p className="text-black/50 dark:text-white/50 text-[0.9375rem] mt-1 font-medium">Kanvas akışlarınızı proje bazlı yönetin.</p>
           </div>
         </div>
         
         <button 
           onClick={() => { triggerHaptic('medium'); setIsCreatingProject(true); }}
-          className="px-6 py-3 bg-white dark:bg-[#1c1c1e] text-black dark:text-white border border-black/5 dark:border-white/5 shadow-sm rounded-full font-bold text-[13px] uppercase tracking-wider hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+          className="px-6 py-3 bg-white dark:bg-[#1c1c1e] text-black dark:text-white border border-black/5 dark:border-white/5 shadow-sm rounded-full font-bold text-[0.8125rem] uppercase tracking-wider hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> Yeni Proje
         </button>
@@ -573,7 +608,7 @@ export default function CanvasView({ tasks, onTaskClick, onAddRequest, onClose }
               </div>
               
               <div className="flex items-center justify-between mt-8">
-                <div className="text-[10px] font-bold text-black/30 dark:text-white/30 uppercase tracking-widest">
+                <div className="text-[0.625rem] font-bold text-black/30 dark:text-white/30 uppercase tracking-widest">
                   Kanvas Akışı
                 </div>
                 {isCompleted && (

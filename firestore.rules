@@ -15,17 +15,23 @@ service cloud.firestore {
     
     // Validation: Task
     function isValidTask(data) {
-      return data.keys().hasAll(['title', 'date', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'ownerId', 'createdAt', 'updatedAt']) 
+      return data.keys().hasAll(['title', 'date', 'color', 'type', 'completed', 'ownerId', 'createdAt', 'updatedAt']) 
         && data.title is string && data.title.size() <= 500
         && data.date is string && data.date.size() <= 20
-        && data.startTime is string && data.startTime.size() <= 20
-        && data.endTime is string && data.endTime.size() <= 20
-        && data.duration is string && data.duration.size() <= 50
+        && ( !data.keys().hasAny(['dueDate']) || data.dueDate == null || data.dueDate is string )
+        && ( !data.keys().hasAny(['startTime']) || data.startTime == null || data.startTime is string )
+        && ( !data.keys().hasAny(['endTime']) || data.endTime == null || data.endTime is string )
+        && ( !data.keys().hasAny(['duration']) || data.duration == null || data.duration is string )
+        && ( !data.keys().hasAny(['isAllDay']) || data.isAllDay is bool )
+        && ( !data.keys().hasAny(['importance']) || data.importance is string )
+        && ( !data.keys().hasAny(['inbox']) || data.inbox is bool )
+        && ( !data.keys().hasAny(['rolloverCount']) || data.rolloverCount is number )
         && data.color is string && data.color.size() <= 20
         && data.type is string && data.type.size() <= 20
         && data.completed is bool
         && ( !data.keys().hasAny(['locationName']) || (data.locationName is string && data.locationName.size() <= 200) )
         && ( !data.keys().hasAny(['subtasks']) || data.subtasks is list )
+        && ( !data.keys().hasAny(['reminders']) || data.reminders is list )
         && data.ownerId is string && data.ownerId == request.auth.uid
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -51,7 +57,7 @@ service cloud.firestore {
         && incoming().ownerId == existing().ownerId // Immutable
         && incoming().createdAt == existing().createdAt // Immutable
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'dueDate', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt', 'isAllDay', 'importance', 'inbox', 'rolloverCount', 'reminders']);
         
       allow delete: if isSignedIn() 
         && request.auth.uid == userId 

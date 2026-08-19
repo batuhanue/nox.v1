@@ -79,8 +79,7 @@ app.post('/api/push/sync', (req, res) => {
 });
 
 function checkAndSendNotifications() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
 
   for (const userId of Object.keys(store.userTasks)) {
     const tasks = store.userTasks[userId];
@@ -88,28 +87,50 @@ function checkAndSendNotifications() {
     if (!sub) continue;
 
     for (const task of tasks) {
-      if (!task.completed && task.dueDate && !store.notifiedTasks[task.id]) {
-        const dueDate = new Date(task.dueDate);
-        dueDate.setHours(0, 0, 0, 0);
+      if (task.completed) continue;
+      if (!task.date) continue;
+      
+      const reminders = task.reminders || [
+        { offset: -1440 }, // 1 day before
+        { offset: -60 }    // 1 hour before
+      ];
+      
+      let targetDate = new Date(task.date);
+      if (task.startTime) {
+        const [hours, mins] = task.startTime.split(':');
+        targetDate.setHours(parseInt(hours, 10) || 9, parseInt(mins, 10) || 0, 0, 0);
+      } else {
+        targetDate.setHours(9, 0, 0, 0); // Default to 9 AM if no time specified
+      }
 
-        const diffTime = dueDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      for (let i = 0; i < reminders.length; i++) {
+        const reminder = reminders[i];
+        const reminderKey = `${task.id}-${reminder.offset}`;
+        
+        if (store.notifiedTasks[reminderKey]) continue;
+        
+        const reminderTime = new Date(targetDate.getTime() + reminder.offset * 60000);
+        const diffMinutes = (now.getTime() - reminderTime.getTime()) / 60000;
+        
+        // Trigger if we're past the reminder time, but not more than 60 minutes past
+        if (diffMinutes >= 0 && diffMinutes <= 60) {
+          let timeText = 'Yakında';
+          if (reminder.offset === -1440) timeText = '1 gün sonra';
+          else if (reminder.offset === -120) timeText = '2 saat sonra';
+          else if (reminder.offset === -60) timeText = '1 saat sonra';
+          else if (reminder.offset === -15) timeText = '15 dakika sonra';
+          else if (reminder.offset === 0) timeText = 'Şimdi';
 
-        console.log(`Checking task: ${task.title}, diffDays: ${diffDays}`);
-
-        // Notify if due today, or in 1-3 days
-        if (diffDays >= 0 && diffDays <= 3) {
-          const dayText = diffDays === 0 ? 'bugün' : `${diffDays} gün sonra`;
           const payload = JSON.stringify({
-            title: 'Nox Görev Hatırlatıcısı',
-            body: `"${task.title}" görevi ${dayText} sona eriyor.`,
-            tag: task.id,
+            title: 'Nox Hatırlatıcı',
+            body: `"${task.title}" görevi ${timeText} başlıyor.`,
+            tag: reminderKey,
             url: '/',
           });
 
-          console.log(`Sending notification to user ${userId} for task ${task.id}`);
+          console.log(`Sending notification to user ${userId} for task ${task.id} (offset ${reminder.offset})`);
           webpush.sendNotification(sub, payload).then(() => {
-            store.notifiedTasks[task.id] = true;
+            store.notifiedTasks[reminderKey] = true;
             saveStore();
           }).catch(err => {
             console.error('Push notification failed.', err);
@@ -124,8 +145,8 @@ function checkAndSendNotifications() {
   }
 }
 
-// Periodic check for upcoming deadlines (disabled as notification system was removed)
-// setInterval(checkAndSendNotifications, 30 * 1000); 
+// Periodic check for upcoming deadlines (runs every minute)
+setInterval(checkAndSendNotifications, 60 * 1000); 
 
 
 app.get('/api/push/status', (req, res) => {

@@ -12,10 +12,18 @@ export interface SubTask {
 export interface Task {
   id: string;
   title: string;
-  date: string; // YYYY-MM-DD
-  startTime: string; // e.g. "3:00 PM"
-  endTime: string; // e.g. "3:30 PM"
-  duration: string; // e.g. "30 Min"
+  date: string; // YYYY-MM-DD (Scheduled Date)
+  dueDate?: string; // YYYY-MM-DD (Deadline)
+  startTime?: string; // Made optional for all-day
+  endTime?: string;
+  duration?: string;
+  isAllDay?: boolean;
+  recurrence?: 'none' | 'daily' | 'weekly' | 'weekdays' | 'monthly' | 'custom';
+  importance?: 'normal' | 'important' | 'critical';
+  rolloverCount?: number;
+  status?: 'active' | 'cancelled';
+  inbox?: boolean; // True if it is in the inbox (unplanned)
+  
   color: string; // tailwind class or hex
   attendees: Attendee[];
   type: 'meeting' | 'task';
@@ -26,6 +34,7 @@ export interface Task {
   createdAt?: any;
   updatedAt?: any;
   subtasks?: SubTask[];
+  reminders?: { offset: number; notified?: boolean }[];
 }
 
 export interface DaySchedule {
