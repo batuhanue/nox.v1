@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, MapPin, Plus, Trash2 } from 'lucide-react';
-import { Task, SubTask } from '../types';
+import { X, MapPin, Plus, Trash2, Paperclip, Loader2 } from 'lucide-react';
+import { Task, SubTask, Attachment } from '../types';
 import { triggerHaptic } from '../App';
+import { storage, auth } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose: () => void, onAdd: (task: Partial<Task>) => void, initialTask?: Task | null }) {
   const [title, setTitle] = useState(initialTask?.title || '');
@@ -23,6 +25,73 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
   
   const [subtasks, setSubtasks] = useState<{id?: string, title: string, completed?: boolean}[]>(initialTask?.subtasks || []);
   const [newSubtask, setNewSubtask] = useState('');
+  
+  const [attachments, setAttachments] = useState<Attachment[]>(initialTask?.attachments || []);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (!auth.currentUser) return;
+    const userId = auth.currentUser.uid;
+    
+    setIsUploading(true);
+    triggerHaptic('light');
+    
+    try {
+      const newAttachments: Attachment[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // If file is > 500KB, alert (Storage might not be configured, using base64 as fallback)
+        if (file.size > 500 * 1024) {
+          alert(`"${file.name}" çok büyük. Lütfen 500KB'dan küçük dosyalar yükleyin.`);
+          continue;
+        }
+
+        try {
+          // Attempt Firebase Storage
+          const fileRef = ref(storage, `users/${userId}/attachments/${Date.now()}_${file.name}`);
+          const uploadResult = await uploadBytes(fileRef, file);
+          const downloadURL = await getDownloadURL(uploadResult.ref);
+          newAttachments.push({
+            id: `file-${Date.now()}-${i}`,
+            name: file.name,
+            url: downloadURL,
+            type: file.type || 'application/octet-stream',
+            size: file.size
+          });
+        } catch (storageErr) {
+          console.error("Storage upload failed, falling back to base64", storageErr);
+          // Fallback to base64 if Storage rules block us
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          newAttachments.push({
+            id: `file-${Date.now()}-${i}`,
+            name: file.name,
+            url: base64,
+            type: file.type || 'application/octet-stream',
+            size: file.size
+          });
+        }
+      }
+      setAttachments(prev => [...prev, ...newAttachments]);
+      triggerHaptic('success');
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      alert("Yükleme başarısız: " + err.message);
+      triggerHaptic('warning');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
   
   const [reminder, setReminder] = useState<number>(() => {
     if (initialTask?.reminders && initialTask.reminders.length > 0) {
@@ -69,6 +138,7 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
       duration: durStr,
       locationName: locationName || undefined,
       reminders: reminder === 1 ? [] : [{ offset: reminder }],
+      attachments,
       subtasks: subtasks.map(s => ({
         id: s.id || `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         title: s.title,
@@ -288,6 +358,57 @@ export default function AddTaskModal({ onClose, onAdd, initialTask }: { onClose:
               >
                 <Plus className="w-4 h-4" />
               </button>
+            </div>
+          </div>
+
+          {/* Attachments Section */}
+          <div className="pt-2 border-t-2 border-black/5 dark:border-white/5 mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest block">Dosyalar</label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-blue-500 bg-blue-500/10 px-2.5 py-1 rounded-full hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+              >
+                {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
+                Ekle
+              </button>
+              <input
+                type="file"
+                multiple
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </div>
+            <div className="space-y-2">
+              <AnimatePresence>
+                {attachments.map((file) => (
+                  <motion.div
+                    key={file.id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center justify-between bg-black/5 dark:bg-white/5 rounded-xl px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <Paperclip className="w-3.5 h-3.5 text-black/40 dark:text-white/40 shrink-0" />
+                      <span className="text-[0.8125rem] font-medium text-black/80 dark:text-white/80 line-clamp-1 break-all">{file.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setAttachments(attachments.filter(a => a.id !== file.id));
+                      }}
+                      className="p-1.5 text-black/40 hover:text-red-500 dark:text-white/40 dark:hover:text-red-400 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
 

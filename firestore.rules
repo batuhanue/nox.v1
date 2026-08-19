@@ -32,6 +32,7 @@ service cloud.firestore {
         && ( !data.keys().hasAny(['locationName']) || (data.locationName is string && data.locationName.size() <= 200) )
         && ( !data.keys().hasAny(['subtasks']) || data.subtasks is list )
         && ( !data.keys().hasAny(['reminders']) || data.reminders is list )
+        && ( !data.keys().hasAny(['attachments']) || data.attachments is list )
         && data.ownerId is string && data.ownerId == request.auth.uid
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -57,7 +58,7 @@ service cloud.firestore {
         && incoming().ownerId == existing().ownerId // Immutable
         && incoming().createdAt == existing().createdAt // Immutable
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'dueDate', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt', 'isAllDay', 'importance', 'inbox', 'rolloverCount', 'reminders']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'dueDate', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt', 'isAllDay', 'importance', 'inbox', 'rolloverCount', 'reminders', 'attachments']);
         
       allow delete: if isSignedIn() 
         && request.auth.uid == userId 

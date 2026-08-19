@@ -197,8 +197,22 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
   const processedEdges = edges.map(edge => {
     const sourceNode = syncedNodes.find(n => n.id === edge.source);
     const targetNode = syncedNodes.find(n => n.id === edge.target);
-    const sourceCompleted = (sourceNode?.data as any)?.task?.completed;
-    const targetCompleted = (targetNode?.data as any)?.task?.completed;
+    const sourceTask = (sourceNode?.data as any)?.task;
+    const targetTask = (targetNode?.data as any)?.task;
+    
+    let sourceCompleted = sourceTask?.completed;
+    if (edge.sourceHandle && edge.sourceHandle.startsWith('st-source-')) {
+      const stId = edge.sourceHandle.replace('st-source-', '');
+      const st = sourceTask?.subtasks?.find((s: any) => s.id === stId);
+      if (st) sourceCompleted = st.completed;
+    }
+
+    let targetCompleted = targetTask?.completed;
+    if (edge.targetHandle && edge.targetHandle.startsWith('st-target-')) {
+      const stId = edge.targetHandle.replace('st-target-', '');
+      const st = targetTask?.subtasks?.find((s: any) => s.id === stId);
+      if (st) targetCompleted = st.completed;
+    }
     
     const isCompleted = sourceCompleted && targetCompleted;
     

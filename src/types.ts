@@ -3,6 +3,14 @@ export interface Attendee {
   avatarUrl: string;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
 export interface SubTask {
   id: string;
   title: string;
@@ -35,6 +43,7 @@ export interface Task {
   updatedAt?: any;
   subtasks?: SubTask[];
   reminders?: { offset: number; notified?: boolean }[];
+  attachments?: Attachment[];
 }
 
 export interface DaySchedule {

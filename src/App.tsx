@@ -236,12 +236,25 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
           )}
         </div>
         
-        {task.subtasks && task.subtasks.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-black/10 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-black/40" />
-            <span className="text-[0.6875rem] font-bold text-black/60 uppercase tracking-widest">
-              {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} Alt Görev
-            </span>
+        {(task.subtasks && task.subtasks.length > 0 || task.attachments && task.attachments.length > 0) && (
+          <div className="mt-4 pt-4 border-t border-black/10 flex items-center justify-between">
+            {task.subtasks && task.subtasks.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-black/40" />
+                <span className="text-[0.6875rem] font-bold text-black/60 uppercase tracking-widest">
+                  {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} Alt Görev
+                </span>
+              </div>
+            ) : <div />}
+            
+            {task.attachments && task.attachments.length > 0 && (
+              <div className="flex items-center gap-1.5 text-black/50">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <span className="text-[0.6875rem] font-bold uppercase tracking-widest">
+                  {task.attachments.length} Dosya
+                </span>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -779,7 +792,16 @@ export default function App() {
     if (!user || !undoTask) return;
     try {
       const taskRef = doc(db, `users/${user.uid}/tasks`, undoTask.id);
-      await setDoc(taskRef, undoTask);
+      
+      // Filter out 'id' from undoTask to prevent it from being saved as a field
+      const { id, createdAt, updatedAt, ...restTask } = undoTask as any;
+      
+      await setDoc(taskRef, {
+        ...restTask,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      
       setUndoTask(null);
       if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
       triggerHaptic('light');
@@ -830,7 +852,7 @@ export default function App() {
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
     const taskId = Date.now().toString(); // Use as custom doc ID
-    const newTask = {
+    const newTask: any = {
       title: taskData.title || '',
       date: taskData.date || getLocalISODate(new Date()),
       dueDate: taskData.dueDate || null,
@@ -851,7 +873,13 @@ export default function App() {
     };
     
     if (taskData.locationName) {
-      (newTask as any).locationName = taskData.locationName;
+      newTask.locationName = taskData.locationName;
+    }
+    if (taskData.attachments) {
+      newTask.attachments = taskData.attachments;
+    }
+    if (taskData.reminders) {
+      newTask.reminders = taskData.reminders;
     }
 
     try {
@@ -936,7 +964,7 @@ export default function App() {
               <button
                 key={tab}
                 onClick={() => { triggerHaptic('light'); setView(tab); }}
-                className={`relative px-3 sm:px-5 py-1.5 sm:py-2 text-[0.6875rem] sm:text-[0.8125rem] tracking-wide font-semibold z-10 transition-colors duration-300 ${
+                className={`relative px-2.5 sm:px-5 py-1 sm:py-2 text-[0.625rem] sm:text-[0.8125rem] tracking-wide font-semibold z-10 transition-colors duration-300 ${
                   view === tab ? "text-white dark:text-black" : "text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
                 }`}
                 style={{ WebkitTapHighlightColor: "transparent", outline: "none" }}
@@ -1135,19 +1163,7 @@ export default function App() {
                               onClick={() => {
                                 triggerHaptic('light');
                                 const updatedSubtasks = selectedTask.subtasks!.map(s => s.id === st.id ? { ...s, completed: !s.completed } : s);
-                                // We need to update this task in the database.
-                                // Calling a global function or direct update here.
-                                // Instead of a full update flow, let's dispatch an event or do it inline
-                                import('./firebase').then(({ db, auth }) => {
-                                  import('firebase/firestore').then(({ doc, updateDoc }) => {
-                                    const user = auth.currentUser;
-                                    if (user) {
-                                      updateDoc(doc(db, `users/${user.uid}/tasks/${selectedTask.id}`), {
-                                        subtasks: updatedSubtasks
-                                      });
-                                    }
-                                  });
-                                });
+                                updateTask(selectedTask.id, { subtasks: updatedSubtasks });
                                 setSelectedTask({ ...selectedTask, subtasks: updatedSubtasks });
                               }}
                               className="flex items-center gap-2 text-left hover:bg-black/5 p-1 rounded-lg transition-colors"
@@ -1157,6 +1173,34 @@ export default function App() {
                               </div>
                               <span className={`text-[0.8125rem] font-semibold text-black/80 ${st.completed ? 'line-through opacity-50' : ''}`}>{st.title}</span>
                             </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                      <div className="mt-2 bg-black/5 rounded-2xl p-4">
+                        <h5 className="text-[0.6875rem] font-bold text-black/40 uppercase tracking-widest mb-3">Dosyalar</h5>
+                        <div className="flex flex-col gap-2">
+                          {selectedTask.attachments.map((file) => (
+                            <a
+                              key={file.id}
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-left bg-black/5 hover:bg-black/10 p-2.5 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <div className="w-8 h-8 shrink-0 rounded-lg bg-black/10 flex items-center justify-center text-black/60">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                              </div>
+                              <div className="flex-1 overflow-hidden">
+                                <div className="text-[0.8125rem] font-semibold text-black/80 line-clamp-1">{file.name}</div>
+                                <div className="text-[0.6875rem] text-black/50 uppercase">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                              </div>
+                              <div className="p-1.5 rounded-full hover:bg-black/10 transition-colors text-black/40 hover:text-black">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                              </div>
+                            </a>
                           ))}
                         </div>
                       </div>
