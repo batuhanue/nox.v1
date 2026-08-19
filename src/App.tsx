@@ -287,11 +287,10 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
   );
 }
 
-function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void }) {
+function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void }) {
   const today = new Date();
-  const dayName = today.toLocaleDateString("tr-TR", { weekday: "long" });
   const dayNum = today.getDate();
-  const monthName = today.toLocaleDateString("tr-TR", { month: "short" }).toUpperCase().replace('.', '');
+  const monthName = today.toLocaleDateString("tr-TR", { month: "long" }).toUpperCase();
   const todayStr = getLocalISODate(today);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -312,8 +311,6 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
   };
 
   const weekDates = getWeekDays();
-
-  const weekLabels = ["Pzt", "Sal", "Çar", "Per", "Cum"];
   const maxHoursPerDay = 8; // 8-hour workday is 100%
 
   const weekData = weekDates.map((date, i) => {
@@ -333,55 +330,34 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
       return acc + hours;
     }, 0);
 
-    const percentage = Math.min((totalHours / maxHoursPerDay) * 100, 100);
-    return { label: weekLabels[i], percentage, totalHours };
+    return { totalHours };
   });
 
   const totalWeekHours = weekData.reduce((acc, curr) => acc + curr.totalHours, 0);
   const overallPercentage = Math.round(Math.min((totalWeekHours / (5 * maxHoursPerDay)) * 100, 100));
 
-  const overdueTasks = tasks.filter(t => !t.completed && !t.inbox && t.date && t.date < todayStr);
+  const totalBlocks = 10;
+  const filledBlocks = Math.round((overallPercentage / 100) * totalBlocks);
+  const emptyBlocks = totalBlocks - filledBlocks;
+
+  const inboxCount = tasks.filter(t => t.inbox && !t.completed).length;
+  
   const todayTasks = tasks.filter(t => t.date === todayStr && !t.inbox);
+  const overdueTasks = tasks.filter(t => !t.completed && !t.inbox && t.date && t.date < todayStr);
+
+  const focusTasks = [...todayTasks].filter(t => !t.completed).sort((a, b) => (b.importance === 'high' ? 1 : 0) - (a.importance === 'high' ? 1 : 0)).slice(0, 3);
+  
+  const programTasks = todayTasks.filter(t => !t.completed && !!t.startTime).sort((a, b) => a.startTime!.localeCompare(b.startTime!));
+  
+  const freeTasks = todayTasks.filter(t => !t.completed && !t.startTime);
 
   return (
-    <div className="flex flex-col px-6 md:px-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between mt-8 mb-10">
-        <div className="pr-6 md:pr-10 border-r border-black/10 shrink-0">
-          <h2 className="text-sm font-semibold text-black dark:text-white tracking-wide mb-1 capitalize">
-            {dayName}
-          </h2>
-          <div className="text-[5.5rem] leading-[0.8] font-semibold tracking-tighter text-black dark:text-white">
-            {dayNum}
-            <br />
-            <span className="text-[4rem]">{monthName}</span>
-          </div>
-        </div>
-        
-        <div className="pl-6 md:pl-10 flex flex-col items-end justify-center flex-1">
-          <div className="text-[0.625rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Haftalık Yoğunluk</div>
-          <div className="flex items-end gap-3 md:gap-4 h-16 mb-2">
-            {weekData.map((day, i) => (
-              <div key={i} className="flex flex-col items-center gap-2">
-                <div className="w-2.5 md:w-3 h-14 bg-black/5 dark:bg-white/5 rounded-full relative overflow-hidden flex items-end">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${day.percentage}%` }}
-                    transition={{ type: "spring", bounce: 0, duration: 1.2, delay: i * 0.1 }}
-                    className="w-full bg-black dark:bg-white rounded-full"
-                  />
-                </div>
-                <span className="text-[0.625rem] font-bold text-black/30 dark:text-white/30">{day.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="text-xl md:text-2xl font-bold tracking-tight text-black dark:text-white mt-1">
-            %{overallPercentage}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sm text-black dark:text-white">Günün Görevleri</h3>
+    <div className="flex flex-col px-6 md:px-12 py-10 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+      
+      <div className="flex items-center justify-between mb-16">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-black dark:text-white uppercase flex items-center gap-3">
+          {dayNum} {monthName}
+        </h1>
         <button 
           onClick={() => {
             triggerHaptic('light');
@@ -389,110 +365,108 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
           }}
           className={`text-[0.625rem] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider transition-colors ${
             notificationPermission === 'granted' 
-              ? 'bg-black dark:bg-white text-white dark:text-black' 
-              : 'bg-[#e5e5e5] dark:bg-[#1c1c1e] text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
+              ? 'bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40' 
+              : 'bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80'
           }`}
         >
-          {notificationPermission === 'granted' ? 'Anımsatıcılar Açık' : 
+          {notificationPermission === 'granted' ? 'Bildirimler Açık' : 
            notificationPermission === 'denied' ? 'Bildirimler Engellendi' : 
-           'Anımsatıcıları Aç'}
+           'Bildirimleri Aç'}
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 pb-12">
-        {overdueTasks.length > 0 && (
-          <div className="mb-6">
-            <h3 className="font-semibold text-sm text-red-500 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              Geciken Görevler
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              <AnimatePresence mode="popLayout">
-                {overdueTasks.map((task) => (
-                  <motion.div
-                    layout
-                    key={task.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 flex flex-col gap-3"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-[0.9375rem] font-semibold text-red-500 line-clamp-1">{task.title}</h4>
-                        <p className="text-[0.6875rem] font-medium text-red-500/60 mt-0.5">{task.date} tarihinde tamamlanmadı</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <button 
-                        onClick={() => updateTask(task.id, { date: todayStr, rolloverCount: (task.rolloverCount || 0) + 1 })}
-                        className="text-[0.6875rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                      >
-                        Bugüne Taşı
-                      </button>
-                      <button 
-                        onClick={() => updateTask(task.id, { date: tomorrowStr, rolloverCount: (task.rolloverCount || 0) + 1 })}
-                        className="text-[0.6875rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-black/5 dark:bg-white/5 text-black dark:text-white rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                      >
-                        Yarına Taşı
-                      </button>
-                      <button 
-                        onClick={() => updateTask(task.id, { inbox: true })}
-                        className="text-[0.6875rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-black/5 dark:bg-white/5 text-black dark:text-white rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                      >
-                        Inbox'a Al
-                      </button>
-                      <button 
-                        onClick={() => deleteTask(task.id)}
-                        className="text-[0.6875rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-black/5 dark:bg-white/5 text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
-                      >
-                        İptal Et
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
+      <div className="mb-14">
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Haftalık Yoğunluk</h2>
+        <div className="flex gap-1.5 items-center">
+          {Array.from({ length: filledBlocks }).map((_, i) => (
+            <div key={`filled-${i}`} className="h-3.5 w-6 bg-black dark:bg-white rounded-[2px]" />
+          ))}
+          {Array.from({ length: emptyBlocks }).map((_, i) => (
+            <div key={`empty-${i}`} className="h-3.5 w-6 bg-black/10 dark:bg-white/10 rounded-[2px]" />
+          ))}
+          <span className="text-sm font-bold text-black/40 dark:text-white/40 ml-2">% {overallPercentage}</span>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {overdueTasks.length > 0 && (
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+             Gecikenler
+          </h2>
+          <div className="flex flex-col gap-3">
+            <AnimatePresence mode="popLayout">
+              {overdueTasks.map(t => (
+                <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-center justify-between group">
+                   <div className="flex flex-col">
+                     <span onClick={() => onTaskClick(t)} className="text-red-500 font-semibold text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity">{t.title}</span>
+                     <span className="text-[0.6875rem] font-medium text-red-500/60 mt-0.5">{t.date}</span>
+                   </div>
+                   <button onClick={() => updateTask(t.id, { date: todayStr })} className="text-[0.625rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">
+                     Bugüne Taşı
+                   </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-14">
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Bugünün Odağı</h2>
+        <div className="flex flex-col gap-4">
           <AnimatePresence mode="popLayout">
-            {todayTasks.map((task) => (
-              <TaskCard key={task.id} task={task} toggleTask={toggleTask} deleteTask={deleteTask} onTaskClick={onTaskClick} />
+            {focusTasks.map((t, i) => (
+              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-4 cursor-pointer group">
+                <span className="text-black/30 dark:text-white/30 font-bold mt-0.5">{i + 1}</span>
+                <span className="text-black dark:text-white font-semibold text-lg leading-tight group-hover:opacity-70 transition-opacity">{t.title}</span>
+              </motion.div>
             ))}
           </AnimatePresence>
+          {focusTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Odak belirlenmedi</span>}
         </div>
-        
-        {Object.entries(
-          tasks
-            .filter(t => t.date > getLocalISODate(today))
-            .reduce((acc, task) => {
-              if (!acc[task.date]) acc[task.date] = [];
-              acc[task.date].push(task);
-              return acc;
-            }, {} as Record<string, Task[]>)
-        )
-        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-        .map(([dateStr, dayTasks]) => {
-          const d = new Date(dateStr);
-          const formattedDay = d.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
-          
-          return (
-            <div key={dateStr} className="mt-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm text-black dark:text-white capitalize">{formattedDay}</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {dayTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} toggleTask={toggleTask} deleteTask={deleteTask} onTaskClick={onTaskClick} />
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
-          );
-        })}
+      </div>
+
+      <div className="mb-14">
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Program</h2>
+        <div className="flex flex-col gap-4">
+          <AnimatePresence mode="popLayout">
+            {programTasks.map(t => (
+              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-5 cursor-pointer group">
+                <span className="text-black/40 dark:text-white/40 font-bold w-12 text-sm shrink-0 mt-0.5 tracking-wide">{t.startTime}</span>
+                <span className="text-black dark:text-white font-medium text-[15px] group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {programTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Program boş</span>}
+        </div>
+      </div>
+
+      <div className="mb-14">
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Serbest Görevler</h2>
+        <div className="flex flex-col gap-3">
+          <AnimatePresence mode="popLayout">
+            {freeTasks.map(t => (
+              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-start gap-3 group">
+                <button onClick={() => { triggerHaptic('success'); toggleTask(t.id, t.completed); }} className="mt-0.5 shrink-0">
+                  <div className="w-5 h-5 border-2 border-black/20 dark:border-white/20 rounded-[6px] hover:border-black/40 dark:hover:border-white/40 transition-colors" />
+                </button>
+                <span onClick={() => onTaskClick(t)} className="text-black dark:text-white font-medium text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {freeTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Serbest görev yok</span>}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Aklımda</h2>
+        <div 
+          onClick={() => { triggerHaptic('light'); setView('inbox'); }}
+          className="flex items-center gap-3 cursor-pointer group bg-black/5 dark:bg-white/5 p-4 rounded-2xl hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+        >
+          <span className="text-black/60 dark:text-white/60 font-medium text-[15px]">{inboxCount} Inbox öğesi</span>
+        </div>
       </div>
     </div>
   );
@@ -1083,6 +1057,7 @@ export default function App() {
               onTaskClick={setSelectedTask} 
               notificationPermission={notificationPermission}
               onRequestPermission={onRequestPermission}
+              setView={setView}
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />

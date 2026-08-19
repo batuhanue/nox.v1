@@ -46,6 +46,34 @@ export interface Task {
   attachments?: Attachment[];
 }
 
+export type CanvasNodeKind = 'task' | 'note' | 'milestone' | 'file' | 'link' | 'checklist' | 'decision' | 'frame';
+
+export interface CanvasNodeData {
+  kind: CanvasNodeKind;
+  
+  // Specific to task
+  taskId?: string;
+
+  // General fields
+  title?: string;
+  content?: string;
+  color?: string;
+
+  // File / Link
+  attachmentId?: string;
+  url?: string;
+
+  // Checklist
+  checklist?: {
+    id: string;
+    text: string;
+    completed: boolean;
+  }[];
+
+  // Logic fields
+  completionRelevant?: boolean;
+}
+
 export interface DaySchedule {
   date: string; // YYYY-MM-DD
   color: string;

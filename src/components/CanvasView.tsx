@@ -15,11 +15,12 @@ import {
   EdgeChange,
   Connection,
   ReactFlowProvider,
+  NodeResizer,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Task } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, Plus, ChevronLeft, LogOut, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, Plus, ChevronLeft, LogOut, CheckCircle2, FileText, Link2, ListTodo, GitMerge, Flag, GripVertical } from 'lucide-react';
 import { db, auth } from '../firebase';
 import { doc, getDoc, setDoc, collection, onSnapshot, query, serverTimestamp } from 'firebase/firestore';
 import { triggerHaptic } from '../App';
@@ -104,8 +105,253 @@ const TaskNode = ({ data, id }: NodeProps<Node<{ task: Task, onTaskClick: (t: Ta
   );
 };
 
+// Custom Node Component for Sticky Notes
+const StickyNoteNode = ({ data, id, selected }: NodeProps<Node<{ title?: string, content?: string, color?: string, onChange?: (d: any) => void }>>) => {
+  const { title = '', content = '', color = '#fef3c7', onChange } = data;
+  const [isEditing, setIsEditing] = useState(false);
+  const [localTitle, setLocalTitle] = useState(title);
+  const [localContent, setLocalContent] = useState(content);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    if (onChange) {
+      onChange({ title: localTitle, content: localContent, color });
+    }
+  };
+
+  return (
+    <div 
+      className={`rounded-[16px] p-4 shadow-md border-2 transition-all duration-200 w-[220px] min-h-[220px] flex flex-col ${selected ? 'border-black/30 scale-[1.02] shadow-xl' : 'border-black/5'}`}
+      style={{ backgroundColor: color }}
+      onDoubleClick={() => setIsEditing(true)}
+    >
+      <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-white border-2 !border-black/20" />
+      <Handle type="target" position={Position.Top} className="w-3 h-3 !bg-white border-2 !border-black/20" />
+      
+      {isEditing ? (
+        <div className="flex flex-col h-full gap-2 relative">
+          <input 
+            autoFocus
+            className="font-bold text-black/80 bg-black/5 border-none outline-none rounded p-1.5 text-sm w-full"
+            placeholder="Başlık (isteğe bağlı)"
+            value={localTitle}
+            onChange={e => setLocalTitle(e.target.value)}
+            onKeyDown={e => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') {
+                setLocalTitle(title); setLocalContent(content); setIsEditing(false);
+              }
+            }}
+          />
+          <textarea 
+            className="flex-1 font-medium text-black/70 bg-black/5 border-none outline-none rounded p-1.5 text-sm w-full resize-none min-h-[120px]"
+            placeholder="Notunuzu yazın... (Kaydetmek için Cmd/Ctrl + Enter)"
+            value={localContent}
+            onChange={e => setLocalContent(e.target.value)}
+            onKeyDown={e => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') {
+                setLocalTitle(title); setLocalContent(content); setIsEditing(false);
+              }
+            }}
+          />
+          <div className="flex justify-between items-center mt-2">
+            <div className="flex gap-1.5">
+              {['#fef3c7', '#fecdd3', '#dcfce7', '#e0e7ff', '#f3f4f6'].map(c => (
+                <button 
+                  key={c}
+                  onClick={() => onChange && onChange({ color: c })}
+                  className={`w-5 h-5 rounded-full border border-black/10 ${color === c ? 'ring-2 ring-black/30 ring-offset-1' : ''}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <button onClick={handleSave} className="text-[10px] font-bold uppercase tracking-wider bg-black/10 px-2 py-1 rounded">Bitti</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col h-full pointer-events-none cursor-grab">
+          {title && <h4 className="font-bold text-black/80 text-sm mb-2 uppercase tracking-wide border-b border-black/10 pb-2">{title}</h4>}
+          <p className="font-medium text-black/70 text-sm whitespace-pre-wrap flex-1">{content || <span className="opacity-40 italic">Çift tıklayarak düzenle...</span>}</p>
+        </div>
+      )}
+
+      <Handle type="source" position={Position.Right} className="w-3 h-3 !bg-white border-2 !border-black/20" />
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 !bg-white border-2 !border-black/20" />
+    </div>
+  );
+};
+
+// Custom Node Component for Frames
+const FrameNode = ({ data, id, selected }: NodeProps<Node<{ title?: string, color?: string, onChange?: (d: any) => void }>>) => {
+  const { title = 'YENİ ALAN', color = '#f3f4f6', onChange } = data;
+  const [isEditing, setIsEditing] = useState(false);
+  const [localTitle, setLocalTitle] = useState(title);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    if (onChange) onChange({ title: localTitle });
+  };
+
+  return (
+    <div 
+      className={`rounded-[24px] border-4 transition-colors w-full h-full relative ${selected ? 'border-black/30' : 'border-black/10'}`}
+      style={{ backgroundColor: `${color}40` }} // 25% opacity
+    >
+      <div 
+        className="absolute top-0 left-0 right-0 h-12 bg-black/5 rounded-t-[20px] flex items-center px-6 cursor-grab active:cursor-grabbing"
+        onDoubleClick={() => setIsEditing(true)}
+      >
+        {isEditing ? (
+          <input 
+            autoFocus
+            className="font-bold text-black/80 bg-white/50 border-none outline-none rounded p-1 text-sm tracking-widest uppercase w-64"
+            value={localTitle}
+            onChange={e => setLocalTitle(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') {
+                setLocalTitle(title); setIsEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <h3 className="font-bold text-black/60 text-sm tracking-widest uppercase">{title}</h3>
+        )}
+      </div>
+      
+      {selected && (
+        <div className="absolute top-3 right-4 flex gap-1.5 z-10">
+          {['#f3f4f6', '#fef3c7', '#fecdd3', '#dcfce7', '#e0e7ff'].map(c => (
+             <button 
+               key={c}
+               onClick={() => onChange && onChange({ color: c })}
+               className={`w-5 h-5 rounded-full border border-black/10 ${color === c ? 'ring-2 ring-black/30 ring-offset-1' : ''}`}
+               style={{ backgroundColor: c }}
+             />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Node for Milestone
+const MilestoneNode = ({ data, selected }: NodeProps<Node<{ title?: string, color?: string, onChange?: (d: any) => void }>>) => {
+  const { title = 'Kilometre Taşı', color = '#000000', onChange } = data;
+  const [isEditing, setIsEditing] = useState(false);
+  const [localTitle, setLocalTitle] = useState(title);
+
+  return (
+    <div className={`relative flex items-center justify-center p-3 px-6 rounded-full shadow-lg border-2 ${selected ? 'border-black/30 scale-[1.02]' : 'border-black/5'}`} style={{ backgroundColor: color === '#000000' ? '#111' : color, color: color === '#000000' ? '#fff' : '#000' }} onDoubleClick={() => setIsEditing(true)}>
+      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <Handle type="target" position={Position.Left} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <Flag className="w-4 h-4 mr-2" />
+      {isEditing ? (
+        <input 
+          autoFocus className="font-bold bg-transparent border-none outline-none text-sm w-32" style={{ color: color === '#000000' ? '#fff' : '#000' }}
+          value={localTitle} onChange={e => setLocalTitle(e.target.value)}
+          onBlur={() => { setIsEditing(false); if (onChange) onChange({ title: localTitle }); }}
+          onKeyDown={e => { if (e.key === 'Enter') { setIsEditing(false); if (onChange) onChange({ title: localTitle }); } }}
+        />
+      ) : (
+        <span className="font-bold text-sm tracking-wide">{title}</span>
+      )}
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+    </div>
+  );
+};
+
+// Custom Node for File
+const FileNode = ({ data, selected }: NodeProps<Node<{ title?: string, onChange?: (d: any) => void }>>) => {
+  const { title = 'Dosya', onChange } = data;
+  return (
+    <div className={`relative flex items-center p-3 rounded-[12px] shadow-sm bg-white border-2 ${selected ? 'border-blue-500 scale-[1.02]' : 'border-black/5'}`}>
+      <Handle type="target" position={Position.Left} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <div className="w-8 h-8 rounded bg-blue-500/10 flex items-center justify-center mr-3">
+        <FileText className="w-4 h-4 text-blue-600" />
+      </div>
+      <span className="font-semibold text-sm text-black/80">{title}</span>
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+    </div>
+  );
+};
+
+// Custom Node for Link
+const LinkNode = ({ data, selected }: NodeProps<Node<{ title?: string, url?: string, onChange?: (d: any) => void }>>) => {
+  const { title = 'Bağlantı', url = '', onChange } = data;
+  return (
+    <div className={`relative flex items-center p-3 rounded-[12px] shadow-sm bg-white border-2 ${selected ? 'border-emerald-500 scale-[1.02]' : 'border-black/5'}`}>
+      <Handle type="target" position={Position.Left} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <div className="w-8 h-8 rounded bg-emerald-500/10 flex items-center justify-center mr-3">
+        <Link2 className="w-4 h-4 text-emerald-600" />
+      </div>
+      <div className="flex flex-col">
+        <span className="font-semibold text-sm text-black/80">{title}</span>
+        {url && <span className="text-[10px] text-black/40 truncate w-32">{url}</span>}
+      </div>
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+    </div>
+  );
+};
+
+// Custom Node for Checklist
+const ChecklistNode = ({ data, selected }: NodeProps<Node<{ title?: string, checklist?: {id: string, text: string, completed: boolean}[], onChange?: (d: any) => void }>>) => {
+  const { title = 'Kontrol Listesi', checklist = [{id: '1', text: 'Öğe 1', completed: false}], onChange } = data;
+  return (
+    <div className={`relative flex flex-col p-4 rounded-[16px] shadow-sm bg-white border-2 min-w-[200px] ${selected ? 'border-purple-500 scale-[1.02]' : 'border-black/5'}`}>
+      <Handle type="target" position={Position.Left} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+      <div className="flex items-center gap-2 mb-3">
+        <ListTodo className="w-4 h-4 text-purple-600" />
+        <span className="font-bold text-sm text-black/80">{title}</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {checklist.map(item => (
+          <div key={item.id} className="flex items-start gap-2">
+            <div onClick={() => {
+              if(onChange) {
+                const newC = checklist.map(c => c.id === item.id ? {...c, completed: !c.completed} : c);
+                onChange({ checklist: newC });
+              }
+            }} className="mt-0.5 cursor-pointer shrink-0">
+              {item.completed ? <CheckCircle2 className="w-4 h-4 text-purple-600" /> : <div className="w-4 h-4 border-2 border-black/20 rounded-full" />}
+            </div>
+            <span className={`text-xs font-medium ${item.completed ? 'text-black/40 line-through' : 'text-black/70'}`}>{item.text}</span>
+          </div>
+        ))}
+      </div>
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-white border-2 !border-black/20" />
+    </div>
+  );
+};
+
+// Custom Node for Decision
+const DecisionNode = ({ data, selected }: NodeProps<Node<{ title?: string, onChange?: (d: any) => void }>>) => {
+  const { title = 'Karar / Koşul', onChange } = data;
+  return (
+    <div className={`relative flex items-center justify-center p-4 rounded-[8px] rotate-45 shadow-sm bg-white border-2 w-24 h-24 ${selected ? 'border-orange-500 scale-[1.02]' : 'border-black/5'}`}>
+      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-white border-2 !border-black/20 -rotate-45" />
+      <div className="-rotate-45 flex flex-col items-center text-center">
+        <GitMerge className="w-4 h-4 text-orange-600 mb-1" />
+        <span className="font-bold text-[10px] text-black/80 leading-tight">{title}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-white border-2 !border-black/20 -rotate-45" />
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-white border-2 !border-black/20 -rotate-45" />
+    </div>
+  );
+};
+
 const nodeTypes = {
   taskNode: TaskNode,
+  stickyNote: StickyNoteNode,
+  frameNode: FrameNode,
+  milestoneNode: MilestoneNode,
+  fileNode: FileNode,
+  linkNode: LinkNode,
+  checklistNode: ChecklistNode,
+  decisionNode: DecisionNode,
 };
 
 interface Project {
@@ -145,53 +391,89 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     if (!user) return;
     const docRef = doc(db, `users/${user.uid}/projects/${projectId}`);
     // Only save the necessary parts of nodes to avoid circular JSON and large sizes
-    const cleanNodes = n.map(node => ({
-      id: node.id,
-      type: node.type,
-      position: node.position,
-      data: { taskId: (node.data as any).taskId } // only store taskId
-    }));
+    const cleanNodes = n.map(node => {
+      // Create a clean data block removing any functions or react elements
+      const cleanData: any = { ...node.data };
+      delete cleanData.task;
+      delete cleanData.onTaskClick;
+      delete cleanData.onChange;
+      
+      return {
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        width: node.width,
+        height: node.height,
+        data: cleanData
+      };
+    });
     await setDoc(docRef, { nodes: cleanNodes, edges: e }, { merge: true });
   }, [projectId]);
 
   // Sync node data with latest task data
   const syncedNodes = nodes.map(node => {
-    const taskId = (node.data as any).taskId;
-    // Look in tasks first, then in subtasks
-    let task = tasks.find(t => t.id === taskId);
-    let originalTask = task;
-    if (!task) {
-      for (const t of tasks) {
-        if (t.subtasks) {
-          const st = t.subtasks.find(s => s.id === taskId);
-          if (st) {
-            originalTask = t; // we'll use originalTask for click handler
-            task = {
-              id: st.id,
-              title: st.title,
-              completed: st.completed,
-              date: t.date,
-              startTime: '',
-              endTime: '',
-              duration: '',
-              color: t.color,
-              attendees: [],
-              type: t.type
-            } as Task;
-            break;
+    const data = node.data as any;
+    const kind = data.kind || (data.taskId ? 'task' : 'note');
+
+    if (kind === 'task' && data.taskId) {
+      const taskId = data.taskId;
+      // Look in tasks first, then in subtasks
+      let task = tasks.find(t => t.id === taskId);
+      let originalTask = task;
+      if (!task) {
+        for (const t of tasks) {
+          if (t.subtasks) {
+            const st = t.subtasks.find(s => s.id === taskId);
+            if (st) {
+              originalTask = t; // we'll use originalTask for click handler
+              task = {
+                id: st.id,
+                title: st.title,
+                completed: st.completed,
+                date: t.date,
+                startTime: '',
+                endTime: '',
+                duration: '',
+                color: t.color,
+                attendees: [],
+                type: t.type
+              } as Task;
+              break;
+            }
           }
         }
       }
+      return {
+        ...node,
+        data: { ...data, kind, task, onTaskClick: (_t: any) => onTaskClick(originalTask || task!) }
+      };
     }
     
+    // For non-task nodes
     return {
       ...node,
-      data: { ...node.data, task, onTaskClick: (_t: any) => onTaskClick(originalTask || task!) }
+      data: { ...data, kind, onChange: (newData: any) => {
+        setNodes(nds => {
+          const newNodes = nds.map(n => n.id === node.id ? { ...n, data: { ...n.data, ...newData } } : n);
+          // Manually trigger save here since we bypassed onNodesChange
+          saveCanvas(newNodes, edges);
+          return newNodes;
+        });
+      }}
     };
   });
 
-  // Check if project is completed (all tasks in canvas are completed and there is at least one task)
-  const isProjectCompleted = syncedNodes.length > 0 && syncedNodes.every(n => (n.data as any).task?.completed);
+  // Calculate completion nodes
+  const completionNodes = syncedNodes.filter(n => {
+    const kind = (n.data as any).kind;
+    const isRelevant = (n.data as any).completionRelevant;
+    if (isRelevant !== undefined) return isRelevant;
+    // Default behaviors
+    return kind === 'task' || kind === 'milestone';
+  });
+
+  // Check if project is completed (all relevant nodes in canvas are completed and there is at least one)
+  const isProjectCompleted = completionNodes.length > 0 && completionNodes.every(n => (n.data as any).task?.completed);
 
   // Calculate flow completion (animated edges turning green)
   const processedEdges = edges.map(edge => {
@@ -269,29 +551,92 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      const taskId = event.dataTransfer.getData('application/reactflow');
-      if (!taskId) return;
+      const rawData = event.dataTransfer.getData('application/reactflow');
+      if (!rawData) return;
       
-      // Prevent adding duplicate tasks
-      if (nodes.some(n => (n.data as any).taskId === taskId)) {
-         triggerHaptic('warning');
-         return;
+      let payload;
+      try {
+        payload = JSON.parse(rawData);
+      } catch (e) {
+        // backward compatibility
+        payload = { kind: 'task', id: rawData };
       }
 
       if (reactFlowWrapper.current) {
         const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
         
         const position = {
-          x: event.clientX - reactFlowBounds.left - 130, // half node width
-          y: event.clientY - reactFlowBounds.top - 50, // half node height
+          x: event.clientX - reactFlowBounds.left - 130, // half node width approx
+          y: event.clientY - reactFlowBounds.top - 50, // half node height approx
         };
 
-        const newNode = {
-          id: `node-${taskId}-${Date.now()}`,
-          type: 'taskNode',
-          position,
-          data: { taskId },
-        };
+        let newNode: Node;
+
+        if (payload.kind === 'task') {
+          const taskId = payload.id;
+          if (nodes.some(n => (n.data as any).taskId === taskId)) {
+             triggerHaptic('warning');
+             return;
+          }
+          newNode = {
+            id: `node-${taskId}-${Date.now()}`,
+            type: 'taskNode',
+            position,
+            data: { taskId, kind: 'task' },
+          };
+        } else if (payload.kind === 'note') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'stickyNote',
+            position,
+            data: { kind: 'note', title: '', content: '', color: '#fef3c7' },
+          };
+        } else if (payload.kind === 'frame') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'frameNode',
+            position,
+            style: { width: 400, height: 300, zIndex: -1 },
+            data: { kind: 'frame', title: 'YENİ ALAN', color: '#f3f4f6' },
+          };
+        } else if (payload.kind === 'milestone') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'milestoneNode',
+            position,
+            data: { kind: 'milestone', title: 'Kilometre Taşı', color: '#000000', completionRelevant: true },
+          };
+        } else if (payload.kind === 'file') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'fileNode',
+            position,
+            data: { kind: 'file', title: 'Dosya', completionRelevant: false },
+          };
+        } else if (payload.kind === 'link') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'linkNode',
+            position,
+            data: { kind: 'link', title: 'Bağlantı', url: 'https://', completionRelevant: false },
+          };
+        } else if (payload.kind === 'checklist') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'checklistNode',
+            position,
+            data: { kind: 'checklist', title: 'Kontrol Listesi', checklist: [{id: '1', text: 'Öğe 1', completed: false}], completionRelevant: false },
+          };
+        } else if (payload.kind === 'decision') {
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'decisionNode',
+            position,
+            data: { kind: 'decision', title: 'Karar / Koşul', completionRelevant: false },
+          };
+        } else {
+          return;
+        }
 
         setNodes((nds) => {
           const newNodes = nds.concat(newNode);
@@ -410,8 +755,99 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
             </div>
             
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 hide-scrollbar">
+              
+              {/* Tools Section */}
+              <div className="mb-2">
+                <h4 className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-2 px-1">Araçlar</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'note' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-black/5 dark:border-white/5 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-[#fef3c7] text-[#92400e]"
+                  >
+                    <span className="text-[11px] font-bold tracking-wide">Not</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'frame' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-black/10 dark:border-white/10 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-black/5 dark:bg-white/5 text-black/70 dark:text-white/70"
+                  >
+                    <span className="text-[11px] font-bold tracking-wide uppercase">Alan</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'milestone' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-black/10 dark:border-white/10 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-black dark:bg-white text-white dark:text-black"
+                  >
+                    <Flag className="w-3 h-3 mr-1" />
+                    <span className="text-[11px] font-bold tracking-wide uppercase">Milestone</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'checklist' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-purple-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-purple-500/10 text-purple-600"
+                  >
+                    <ListTodo className="w-3 h-3 mr-1" />
+                    <span className="text-[11px] font-bold tracking-wide">Checklist</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'file' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-blue-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-blue-500/10 text-blue-600"
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    <span className="text-[11px] font-bold tracking-wide">Dosya</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'link' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-emerald-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-emerald-500/10 text-emerald-600"
+                  >
+                    <Link2 className="w-3 h-3 mr-1" />
+                    <span className="text-[11px] font-bold tracking-wide">Bağlantı</span>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'decision' }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      triggerHaptic('light');
+                    }}
+                    className="px-3 py-2 rounded-[10px] shadow-sm border border-orange-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-orange-500/10 text-orange-600 col-span-2"
+                  >
+                    <GitMerge className="w-3 h-3 mr-1" />
+                    <span className="text-[11px] font-bold tracking-wide uppercase">Karar / Koşul</span>
+                  </div>
+                </div>
+              </div>
+
+              <h4 className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 px-1 mt-2">Görevler</h4>
               {availableTasks.length === 0 ? (
-                <div className="text-center text-black/40 dark:text-white/40 text-[0.6875rem] mt-6 px-2">
+                <div className="text-center text-black/40 dark:text-white/40 text-[0.6875rem] mt-4 px-2">
                   Kanvasa eklenecek görev kalmadı.
                 </div>
               ) : (
@@ -420,7 +856,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                     key={task.id}
                     draggable
                     onDragStart={(e) => {
-                      e.dataTransfer.setData('application/reactflow', task.id);
+                      e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'task', id: task.id }));
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
                     }}
@@ -587,7 +1023,13 @@ export default function CanvasView({ tasks, onTaskClick, onAddRequest, onClose }
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
         {projects.map(project => {
           // Determine if completed based on nodes in project
-          const isCompleted = project.nodes && project.nodes.length > 0 && project.nodes.every(n => {
+          const relevantNodes = (project.nodes || []).filter(n => {
+            const kind = n.data?.kind || (n.data?.taskId ? 'task' : 'note');
+            if (n.data?.completionRelevant !== undefined) return n.data.completionRelevant;
+            return kind === 'task' || kind === 'milestone';
+          });
+
+          const isCompleted = relevantNodes.length > 0 && relevantNodes.every(n => {
              // Look in both tasks and subtasks
              let task = tasks.find(t => t.id === n.data?.taskId);
              if (!task) {
