@@ -1,118 +1,69 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
+    
+    // Global Safety Net
+    match /{document=**} { 
+      allow read, write: if false; 
     }
 
     // Helpers
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Validation: Task
     function isValidTask(data) {
-      let dueDate = data.get('dueDate', null);
-      let isDueDateValid = dueDate == null || (dueDate is string && dueDate.size() <= 100);
-      let priority = data.get('priority', null);
-      let isPriorityValid = priority == null || (priority is string && priority in ['low', 'medium', 'high']);
-      let order = data.get('order', null);
-      let isOrderValid = order == null || order is int;
-      return data.title is string && data.title.size() <= 200 &&
-             data.completed is bool &&
-             data.userId == request.auth.uid &&
-             (data.parentId == null || isValidId(data.parentId)) &&
-             data.createdAt == request.time &&
-             data.updatedAt == request.time &&
-             isDueDateValid &&
-             isPriorityValid &&
-             isOrderValid;
+      return data.keys().hasAll(['title', 'date', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'ownerId', 'createdAt', 'updatedAt']) 
+        && data.title is string && data.title.size() <= 500
+        && data.date is string && data.date.size() <= 20
+        && data.startTime is string && data.startTime.size() <= 20
+        && data.endTime is string && data.endTime.size() <= 20
+        && data.duration is string && data.duration.size() <= 50
+        && data.color is string && data.color.size() <= 20
+        && data.type is string && data.type.size() <= 20
+        && data.completed is bool
+        && ( !data.keys().hasAny(['locationName']) || (data.locationName is string && data.locationName.size() <= 200) )
+        && ( !data.keys().hasAny(['subtasks']) || data.subtasks is list )
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
     }
 
-    function isValidTaskUpdate(existing, incoming) {
-      let dueDate = incoming.get('dueDate', null);
-      let isDueDateValid = dueDate == null || (dueDate is string && dueDate.size() <= 100);
-      let priority = incoming.get('priority', null);
-      let isPriorityValid = priority == null || (priority is string && priority in ['low', 'medium', 'high']);
-      let order = incoming.get('order', null);
-      let isOrderValid = order == null || order is int;
-      return incoming.title is string && incoming.title.size() <= 200 &&
-             incoming.completed is bool &&
-             incoming.userId == existing.userId &&
-             incoming.parentId == existing.parentId &&
-             incoming.createdAt == existing.createdAt &&
-             incoming.updatedAt == request.time &&
-             isDueDateValid &&
-             isPriorityValid &&
-             isOrderValid;
+    // Users Collection (Tasks Subcollection)
+    match /users/{userId}/tasks/{taskId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && existing().ownerId == request.auth.uid;
+      
+      allow list: if isSignedIn() && request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isSignedIn() 
+        && request.auth.uid == userId
+        && existing().ownerId == request.auth.uid
+        && isValidTask(incoming())
+        && incoming().ownerId == existing().ownerId // Immutable
+        && incoming().createdAt == existing().createdAt // Immutable
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt']);
+        
+      allow delete: if isSignedIn() 
+        && request.auth.uid == userId 
+        && existing().ownerId == request.auth.uid;
     }
 
-    function isValidUserSettings(data) {
-      return (data.bgColor is string && data.bgColor.size() <= 20) &&
-             (data.themeColor is string && data.themeColor.size() <= 20) &&
-             (data.autoLightMode is bool) &&
-             (data.updatedAt == request.time);
-    }
-
-    function isValidUserSettingsUpdate(existing, incoming) {
-      return (incoming.bgColor is string && incoming.bgColor.size() <= 20) &&
-             (incoming.themeColor is string && incoming.themeColor.size() <= 20) &&
-             (incoming.autoLightMode is bool) &&
-             (incoming.updatedAt == request.time);
-    }
-
-    // 1. Tasks Collection
-    match /tasks/{taskId} {
-      allow get: if isSignedIn() && isOwner(resource.data.userId);
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      
-      allow create: if isSignedIn() && 
-                      isValidId(taskId) && 
-                      isValidTask(request.resource.data) &&
-                      (request.resource.data.parentId == null || exists(/databases/$(database)/documents/tasks/$(request.resource.data.parentId)));
-      
-      allow update: if isSignedIn() && 
-                      isOwner(resource.data.userId) &&
-                      isValidTaskUpdate(resource.data, request.resource.data) &&
-                      (
-                        // Action: Toggle completion
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completed', 'updatedAt'])) ||
-                        // Action: Edit metadata
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'dueDate', 'priority', 'updatedAt', 'order'])) ||
-                        // Action: Reorder tasks
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['order', 'updatedAt']))
-                      );
-      
-      allow delete: if isSignedIn() && isOwner(resource.data.userId);
-    }
-
-    // 2. Users Collection
-    match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // Users shouldn't be queryable in list view
-      
-      allow create: if isSignedIn() && 
-                      isOwner(userId) &&
-                      isValidUserSettings(request.resource.data);
-      
-      allow update: if isSignedIn() && 
-                      isOwner(userId) &&
-                      isValidUserSettingsUpdate(resource.data, request.resource.data) &&
-                      (
-                        // Action: Update preferences
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bgColor', 'themeColor', 'autoLightMode', 'updatedAt']))
-                      );
-                      
-      allow delete: if false;
+    // Canvas Projects Collection
+    match /users/{userId}/projects/{projectId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
   }
 }

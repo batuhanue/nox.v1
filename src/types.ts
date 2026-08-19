@@ -3,6 +3,12 @@ export interface Attendee {
   avatarUrl: string;
 }
 
+export interface SubTask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -14,6 +20,12 @@ export interface Task {
   attendees: Attendee[];
   type: 'meeting' | 'task';
   completed?: boolean;
+  locationName?: string;
+  locationAddress?: string;
+  ownerId?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  subtasks?: SubTask[];
 }
 
 export interface DaySchedule {
