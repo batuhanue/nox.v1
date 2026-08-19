@@ -24,6 +24,99 @@ import { ChevronRight, Plus, ChevronLeft, LogOut, CheckCircle2, FileText, Link2,
 import { db, auth } from '../firebase';
 import { doc, getDoc, setDoc, collection, onSnapshot, query, serverTimestamp } from 'firebase/firestore';
 import { triggerHaptic } from '../App';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath } from '@xyflow/react';
+
+// Custom Edge
+const CustomEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  data,
+}: EdgeProps) => {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const { relationship = 'RELATES_TO', isCompleted, onChangeType } = data || {};
+
+  const colors: Record<string, string> = {
+    RELATES_TO: '#9ca3af',
+    DEPENDS_ON: '#3b82f6',
+    BLOCKS: '#ef4444',
+    REFERENCE: '#8b5cf6'
+  };
+
+  const labels: Record<string, string> = {
+    RELATES_TO: 'Bağlantılı',
+    DEPENDS_ON: 'Buna Bağlı',
+    BLOCKS: 'Engelliyor',
+    REFERENCE: 'Referans'
+  };
+
+  const baseColor = isCompleted ? '#10b981' : (colors[relationship as string] || '#b0b0b0');
+  const labelText = labels[relationship as string] || 'Bağlantılı';
+
+  const [showMenu, setShowMenu] = useState(false);
+
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, stroke: baseColor, strokeWidth: isCompleted ? 4 : 2 }} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+        >
+          <div className="relative">
+            <button
+              onClick={() => {
+                triggerHaptic('light');
+                setShowMenu(!showMenu);
+              }}
+              className="text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full bg-white dark:bg-black border shadow-sm uppercase opacity-0 hover:opacity-100 transition-opacity"
+              style={{ color: baseColor, borderColor: baseColor }}
+            >
+              {labelText}
+            </button>
+            
+            {showMenu && (
+              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-white dark:bg-[#1c1c1e] shadow-xl border border-black/10 dark:border-white/10 rounded-[12px] p-2 flex flex-col gap-1 z-50 w-32">
+                <span className="text-[9px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-1 px-1">İlişki</span>
+                {Object.keys(labels).map(k => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      triggerHaptic('success');
+                      if (onChangeType) onChangeType(id, k);
+                      setShowMenu(false);
+                    }}
+                    className={`text-left text-[11px] font-semibold px-2 py-1.5 rounded-[8px] transition-colors ${relationship === k ? 'bg-black/5 dark:bg-white/5 text-black dark:text-white' : 'text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                  >
+                    {labels[k]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+};
 
 // Custom Node Component to look like a TaskCard
 const TaskNode = ({ data, id }: NodeProps<Node<{ task: Task, onTaskClick: (t: Task) => void }>>) => {
@@ -354,9 +447,14 @@ const nodeTypes = {
   decisionNode: DecisionNode,
 };
 
+const edgeTypes = {
+  customEdge: CustomEdge,
+};
+
 interface Project {
   id: string;
   name: string;
+  goal?: string;
   createdAt: any;
   nodes?: any[];
   edges?: any[];
@@ -365,6 +463,7 @@ interface Project {
 function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, onBack }: { tasks: Task[], projectId: string, projectName: string, onTaskClick: (t: Task) => void, onAddRequest: () => void, onBack: () => void }) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [projectGoal, setProjectGoal] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -380,6 +479,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
         const data = snapshot.data();
         if (data.nodes) setNodes(data.nodes);
         if (data.edges) setEdges(data.edges);
+        if (data.goal) setProjectGoal(data.goal);
       }
     };
     loadCanvas();
@@ -390,9 +490,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     const user = auth.currentUser;
     if (!user) return;
     const docRef = doc(db, `users/${user.uid}/projects/${projectId}`);
-    // Only save the necessary parts of nodes to avoid circular JSON and large sizes
     const cleanNodes = n.map(node => {
-      // Create a clean data block removing any functions or react elements
       const cleanData: any = { ...node.data };
       delete cleanData.task;
       delete cleanData.onTaskClick;
@@ -409,6 +507,14 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     });
     await setDoc(docRef, { nodes: cleanNodes, edges: e }, { merge: true });
   }, [projectId]);
+
+  const saveGoal = async (goal: string) => {
+    setProjectGoal(goal);
+    const user = auth.currentUser;
+    if (!user) return;
+    const docRef = doc(db, `users/${user.uid}/projects/${projectId}`);
+    await setDoc(docRef, { goal }, { merge: true });
+  };
 
   // Sync node data with latest task data
   const syncedNodes = nodes.map(node => {
@@ -500,7 +606,19 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     
     return {
       ...edge,
+      type: edge.type || 'customEdge',
       animated: true,
+      data: {
+        ...edge.data,
+        isCompleted,
+        onChangeType: (edgeId: string, type: string) => {
+          setEdges(eds => {
+            const newEdges = eds.map(e => e.id === edgeId ? { ...e, data: { ...e.data, relationship: type } } : e);
+            saveCanvas(nodes, newEdges);
+            return newEdges;
+          });
+        }
+      },
       style: {
         stroke: isCompleted ? '#10b981' : '#b0b0b0',
         strokeWidth: isCompleted ? 4 : 2,
@@ -534,13 +652,90 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     (params: Connection) => {
       triggerHaptic('light');
       setEdges((eds) => {
-        const newEdges = addEdge(params, eds);
+        const newEdges = addEdge({ ...params, type: 'customEdge' }, eds);
         saveCanvas(nodes, newEdges);
         return newEdges;
       });
     },
     [nodes, saveCanvas]
   );
+
+  const addNodeToCanvas = useCallback((payload: any, position: { x: number, y: number }) => {
+    let newNode: Node;
+
+    if (payload.kind === 'task') {
+      const taskId = payload.id;
+      if (nodes.some(n => (n.data as any).taskId === taskId)) {
+         triggerHaptic('warning');
+         return;
+      }
+      newNode = {
+        id: `node-${taskId}-${Date.now()}`,
+        type: 'taskNode',
+        position,
+        data: { taskId, kind: 'task' },
+      };
+    } else if (payload.kind === 'note') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'stickyNote',
+        position,
+        data: { kind: 'note', title: '', content: '', color: '#fef3c7' },
+      };
+    } else if (payload.kind === 'frame') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'frameNode',
+        position,
+        style: { width: 400, height: 300, zIndex: -1 },
+        data: { kind: 'frame', title: 'YENİ ALAN', color: '#f3f4f6' },
+      };
+    } else if (payload.kind === 'milestone') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'milestoneNode',
+        position,
+        data: { kind: 'milestone', title: 'Kilometre Taşı', color: '#000000', completionRelevant: true },
+      };
+    } else if (payload.kind === 'file') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'fileNode',
+        position,
+        data: { kind: 'file', title: 'Dosya', completionRelevant: false },
+      };
+    } else if (payload.kind === 'link') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'linkNode',
+        position,
+        data: { kind: 'link', title: 'Bağlantı', url: 'https://', completionRelevant: false },
+      };
+    } else if (payload.kind === 'checklist') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'checklistNode',
+        position,
+        data: { kind: 'checklist', title: 'Kontrol Listesi', checklist: [{id: '1', text: 'Öğe 1', completed: false}], completionRelevant: false },
+      };
+    } else if (payload.kind === 'decision') {
+      newNode = {
+        id: `node-${Date.now()}`,
+        type: 'decisionNode',
+        position,
+        data: { kind: 'decision', title: 'Karar / Koşul', completionRelevant: false },
+      };
+    } else {
+      return;
+    }
+
+    setNodes((nds) => {
+      const newNodes = nds.concat(newNode);
+      saveCanvas(newNodes, edges);
+      return newNodes;
+    });
+    triggerHaptic('success');
+  }, [nodes, edges, saveCanvas]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -570,83 +765,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
           y: event.clientY - reactFlowBounds.top - 50, // half node height approx
         };
 
-        let newNode: Node;
-
-        if (payload.kind === 'task') {
-          const taskId = payload.id;
-          if (nodes.some(n => (n.data as any).taskId === taskId)) {
-             triggerHaptic('warning');
-             return;
-          }
-          newNode = {
-            id: `node-${taskId}-${Date.now()}`,
-            type: 'taskNode',
-            position,
-            data: { taskId, kind: 'task' },
-          };
-        } else if (payload.kind === 'note') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'stickyNote',
-            position,
-            data: { kind: 'note', title: '', content: '', color: '#fef3c7' },
-          };
-        } else if (payload.kind === 'frame') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'frameNode',
-            position,
-            style: { width: 400, height: 300, zIndex: -1 },
-            data: { kind: 'frame', title: 'YENİ ALAN', color: '#f3f4f6' },
-          };
-        } else if (payload.kind === 'milestone') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'milestoneNode',
-            position,
-            data: { kind: 'milestone', title: 'Kilometre Taşı', color: '#000000', completionRelevant: true },
-          };
-        } else if (payload.kind === 'file') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'fileNode',
-            position,
-            data: { kind: 'file', title: 'Dosya', completionRelevant: false },
-          };
-        } else if (payload.kind === 'link') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'linkNode',
-            position,
-            data: { kind: 'link', title: 'Bağlantı', url: 'https://', completionRelevant: false },
-          };
-        } else if (payload.kind === 'checklist') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'checklistNode',
-            position,
-            data: { kind: 'checklist', title: 'Kontrol Listesi', checklist: [{id: '1', text: 'Öğe 1', completed: false}], completionRelevant: false },
-          };
-        } else if (payload.kind === 'decision') {
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'decisionNode',
-            position,
-            data: { kind: 'decision', title: 'Karar / Koşul', completionRelevant: false },
-          };
-        } else {
-          return;
-        }
-
-        setNodes((nds) => {
-          const newNodes = nds.concat(newNode);
-          saveCanvas(newNodes, edges);
-          return newNodes;
-        });
-        triggerHaptic('success');
+        addNodeToCanvas(payload, position);
       }
     },
-    [nodes, edges, saveCanvas]
+    [addNodeToCanvas]
   );
 
   // Flatten tasks and subtasks for the sidebar
@@ -688,21 +810,34 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
             transition={{ type: "spring", bounce: 0, duration: 0.4 }}
             className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-6 py-4 border-b border-black/5 dark:border-white/5 bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-xl shadow-sm"
           >
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => { triggerHaptic('light'); onBack(); }}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold tracking-tight text-black dark:text-white">{projectName}</h2>
-                {isProjectCompleted && (
-                  <span className="flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 text-xs px-2.5 py-1 rounded-full font-bold tracking-wide">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    TAMAMLANDI
-                  </span>
-                )}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => { triggerHaptic('light'); onBack(); }}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold tracking-tight text-black dark:text-white shrink-0">{projectName}</h2>
+                  {isProjectCompleted && (
+                    <span className="flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 text-xs px-2.5 py-1 rounded-full font-bold tracking-wide shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      TAMAMLANDI
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="pl-14 max-w-xl">
+                <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest block mb-0.5">Amaç</span>
+                <input 
+                  type="text" 
+                  value={projectGoal} 
+                  onChange={(e) => setProjectGoal(e.target.value)}
+                  onBlur={() => saveGoal(projectGoal)}
+                  placeholder="Bu projenin temel amacı nedir?"
+                  className="w-full bg-transparent border-none outline-none text-sm font-medium text-black/80 dark:text-white/80 placeholder:text-black/30 dark:placeholder:text-white/30 truncate"
+                />
               </div>
             </div>
             <button 
@@ -767,6 +902,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
                     }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'note' }, pos);
+                    }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-black/5 dark:border-white/5 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-[#fef3c7] text-[#92400e]"
                   >
                     <span className="text-[11px] font-bold tracking-wide">Not</span>
@@ -778,6 +917,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
                     }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'frame' }, pos);
+                    }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-black/10 dark:border-white/10 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-black/5 dark:bg-white/5 text-black/70 dark:text-white/70"
                   >
                     <span className="text-[11px] font-bold tracking-wide uppercase">Alan</span>
@@ -788,6 +931,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'milestone' }));
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
+                    }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'milestone' }, pos);
                     }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-black/10 dark:border-white/10 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-black dark:bg-white text-white dark:text-black"
                   >
@@ -801,6 +948,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
                     }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'checklist' }, pos);
+                    }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-purple-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-purple-500/10 text-purple-600"
                   >
                     <ListTodo className="w-3 h-3 mr-1" />
@@ -812,6 +963,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'file' }));
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
+                    }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'file' }, pos);
                     }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-blue-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-blue-500/10 text-blue-600"
                   >
@@ -825,6 +980,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
                     }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'link' }, pos);
+                    }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-emerald-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-emerald-500/10 text-emerald-600"
                   >
                     <Link2 className="w-3 h-3 mr-1" />
@@ -836,6 +995,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'decision' }));
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
+                    }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'decision' }, pos);
                     }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-orange-500/20 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-center bg-orange-500/10 text-orange-600 col-span-2"
                   >
@@ -859,6 +1022,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
                       e.dataTransfer.setData('application/reactflow', JSON.stringify({ kind: 'task', id: task.id }));
                       e.dataTransfer.effectAllowed = 'move';
                       triggerHaptic('light');
+                    }}
+                    onClick={() => {
+                      const pos = reactFlowWrapper.current ? { x: reactFlowWrapper.current.clientWidth / 2 - 50, y: reactFlowWrapper.current.clientHeight / 2 - 50 } : { x: 100, y: 100 };
+                      addNodeToCanvas({ kind: 'task', id: task.id }, pos);
                     }}
                     className="px-3 py-2 rounded-[10px] shadow-sm border border-black/5 dark:border-white/5 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow flex items-center justify-between"
                     style={{ backgroundColor: task.color }}

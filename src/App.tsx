@@ -375,6 +375,25 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
         </button>
       </div>
 
+      {today.getDay() === 0 && (
+        <div className="mb-14">
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => { triggerHaptic('light'); setView('weekly-review'); }}
+            className="bg-black text-white dark:bg-white dark:text-black rounded-3xl p-6 flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Pazar Günü Rutini</span>
+              <span className="text-xl font-bold tracking-tight">Haftalık Değerlendirme</span>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white/10 dark:bg-black/10 flex items-center justify-center">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <div className="mb-14">
         <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Haftalık Yoğunluk</h2>
         <div className="flex gap-1.5 items-center">
@@ -685,8 +704,133 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
   );
 }
 
+function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: Task[], updateTask: (id: string, updates: Partial<Task>) => void, deleteTask: (id: string) => void, setView: (view: any) => void }) {
+  const today = new Date();
+  const lastWeekDate = new Date(today);
+  lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+  
+  const todayStr = getLocalISODate(today);
+  const lastWeekStr = getLocalISODate(lastWeekDate);
+
+  const pastWeekTasks = tasks.filter(t => t.date && t.date >= lastWeekStr && t.date <= todayStr && !t.inbox);
+  const completedTasks = pastWeekTasks.filter(t => t.completed);
+  
+  const totalPlanned = pastWeekTasks.length;
+  const totalCompleted = completedTasks.length;
+  
+  // Calculate postponed based on rolloverCount
+  const postponedTasks = pastWeekTasks.filter(t => (t.rolloverCount || 0) > 0);
+  const totalPostponed = postponedTasks.reduce((acc, t) => acc + (t.rolloverCount || 0), 0);
+  
+  // Actually, we want to know most postponed task
+  const mostPostponed = [...postponedTasks].sort((a, b) => (b.rolloverCount || 0) - (a.rolloverCount || 0))[0];
+
+  // Busiest day
+  const dayCounts: Record<string, number> = {};
+  pastWeekTasks.forEach(t => {
+    if (t.date) {
+      dayCounts[t.date] = (dayCounts[t.date] || 0) + 1;
+    }
+  });
+  
+  let busiestDate = '';
+  let maxCount = 0;
+  Object.entries(dayCounts).forEach(([date, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      busiestDate = date;
+    }
+  });
+
+  const busiestDayName = busiestDate ? new Date(busiestDate).toLocaleDateString("tr-TR", { weekday: "long" }) : 'Yok';
+
+  // Remaining tasks from last week
+  const remainingTasks = pastWeekTasks.filter(t => !t.completed && t.date && t.date < todayStr);
+
+  return (
+    <div className="flex flex-col px-6 md:px-12 py-10 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+      <div className="flex items-center justify-between mb-12">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-black dark:text-white uppercase flex items-center gap-3">
+          HAFTALIK DEĞERLENDİRME
+        </h1>
+        <button 
+          onClick={() => { triggerHaptic('light'); setView('today'); }}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-12">
+        <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+          <span className="text-4xl font-bold text-black dark:text-white mb-2">{totalPlanned}</span>
+          <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Görev Planlandı</span>
+        </div>
+        <div className="bg-emerald-500/10 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+          <span className="text-4xl font-bold text-emerald-600 mb-2">{totalCompleted}</span>
+          <span className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest">Tamamlandı</span>
+        </div>
+        <div className="bg-orange-500/10 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+          <span className="text-4xl font-bold text-orange-600 mb-2">{totalPostponed}</span>
+          <span className="text-[10px] font-bold text-orange-600/60 uppercase tracking-widest">Kez Ertelendi</span>
+        </div>
+        <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+          <span className="text-xl font-bold text-black dark:text-white mb-2 capitalize">{busiestDayName}</span>
+          <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">En Yoğun Gün</span>
+        </div>
+      </div>
+
+      {mostPostponed && (
+        <div className="mb-12 bg-black/5 dark:bg-white/5 p-6 rounded-3xl flex flex-col items-center text-center">
+          <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-3">En Çok Ertelenen Görev</span>
+          <span className="text-lg font-semibold text-black dark:text-white leading-tight">{mostPostponed.title}</span>
+          <span className="text-xs font-bold text-orange-600 mt-2">{mostPostponed.rolloverCount} kez</span>
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-6 flex items-center justify-between">
+          <span>Geçen Haftadan Kalanlar ({remainingTasks.length})</span>
+          <span>Yeni haftaya aktar?</span>
+        </h2>
+        
+        <div className="flex flex-col gap-4">
+          <AnimatePresence mode="popLayout">
+            {remainingTasks.map(t => (
+              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="bg-white dark:bg-[#1c1c1e] border border-black/10 dark:border-white/10 p-4 rounded-2xl flex flex-col gap-4">
+                <span className="text-black dark:text-white font-semibold text-[15px] leading-snug">{t.title}</span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => { triggerHaptic('success'); updateTask(t.id, { date: todayStr }); }}
+                    className="flex-1 text-[10px] font-bold uppercase tracking-widest px-3 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-80 transition-opacity text-center"
+                  >
+                    Taşı
+                  </button>
+                  <button 
+                    onClick={() => { triggerHaptic('light'); updateTask(t.id, { inbox: true, date: '' }); }}
+                    className="flex-1 text-[10px] font-bold uppercase tracking-widest px-3 py-2 bg-black/5 dark:bg-white/5 text-black dark:text-white rounded-xl hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-center"
+                  >
+                    Inbox
+                  </button>
+                  <button 
+                    onClick={() => { triggerHaptic('warning'); deleteTask(t.id); }}
+                    className="flex-1 text-[10px] font-bold uppercase tracking-widest px-3 py-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-colors text-center"
+                  >
+                    Sil
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {remainingTasks.length === 0 && <span className="text-black/40 dark:text-white/40 text-sm font-medium text-center py-8">Kalan görev yok. Harika bir hafta!</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [view, setView] = useState<"inbox" | "today" | "calendar" | "kanvas">("today");
+  const [view, setView] = useState<"inbox" | "today" | "calendar" | "kanvas" | "weekly-review">("today");
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -1061,6 +1205,8 @@ export default function App() {
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />
+          ) : view === "weekly-review" ? (
+            <WeeklyReviewView tasks={tasks} updateTask={updateTask} deleteTask={deleteTask} setView={setView} />
           ) : (
             <CanvasView tasks={tasks} onTaskClick={setSelectedTask} onAddRequest={() => setIsAdding(true)} onClose={() => setView('today')} />
           )}
