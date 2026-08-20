@@ -10,6 +10,7 @@ import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc
 
 import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
+import { syncGoogleCalendar, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "./lib/googleCalendar";
 
 export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning') => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -832,6 +833,7 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
 export default function App() {
   const [view, setView] = useState<"inbox" | "today" | "calendar" | "kanvas" | "weekly-review">("today");
   const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => typeof window !== 'undefined' ? localStorage.getItem('google_calendar_token') : null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -891,9 +893,25 @@ export default function App() {
     return unsubscribe;
   }, [user]);
 
+  const hasSyncedRef = useRef(false);
+
+  // Sync Google Calendar
+  useEffect(() => {
+    if (user && accessToken && tasks.length > 0 && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      syncGoogleCalendar(accessToken, user.uid, tasks).catch(console.error);
+    }
+  }, [user, accessToken, tasks]); // Run when tasks populate, but only sync once per session
+
   const toggleTask = async (id: string, current: boolean) => {
     if (!user) return;
     try {
+      const taskToToggle = tasks.find(t => t.id === id);
+      if (taskToToggle && taskToToggle.googleEventId && accessToken) {
+          const updatedTask = { ...taskToToggle, completed: !current };
+          await updateGoogleEvent(accessToken, updatedTask.googleEventId, updatedTask).catch(console.error);
+      }
+
       const taskRef = doc(db, `users/${user.uid}/tasks`, id);
       await updateDoc(taskRef, {
         completed: !current,
@@ -910,6 +928,10 @@ export default function App() {
     const taskToDelete = tasks.find(t => t.id === id);
     if (!taskToDelete) return;
     try {
+      if (taskToDelete.googleEventId && accessToken) {
+          await deleteGoogleEvent(accessToken, taskToDelete.googleEventId).catch(console.error);
+      }
+
       const taskRef = doc(db, `users/${user.uid}/tasks`, id);
       await deleteDoc(taskRef);
       triggerHaptic('success');
@@ -955,6 +977,11 @@ export default function App() {
         updatedAt: serverTimestamp()
       });
       triggerHaptic('success');
+      
+      const updatedTask = tasks.find(t => t.id === id);
+      if (updatedTask && updatedTask.googleEventId && accessToken) {
+          await updateGoogleEvent(accessToken, updatedTask.googleEventId, { ...updatedTask, ...updates }).catch(console.error);
+      }
     } catch (e) {
       console.error("Error updating task:", e);
     }
@@ -1019,6 +1046,10 @@ export default function App() {
     }
 
     try {
+      if (accessToken) {
+          const gId = await createGoogleEvent(accessToken, newTask).catch(console.error);
+          if (gId) newTask.googleEventId = gId;
+      }
       const taskRef = doc(db, `users/${user.uid}/tasks`, taskId);
       await setDoc(taskRef, newTask);
       setIsAdding(false);
@@ -1031,7 +1062,13 @@ export default function App() {
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      provider.addScope('https://www.googleapis.com/auth/calendar.events');
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setAccessToken(credential.accessToken);
+        localStorage.setItem('google_calendar_token', credential.accessToken);
+      }
     } catch (error) {
       console.error("Login Error:", error);
     }
@@ -1152,6 +1189,21 @@ export default function App() {
                         {isDarkMode ? 'Açık Mod' : 'Koyu Mod'}
                       </span>
                     </button>
+                    {!accessToken && (
+                      <button
+                        onClick={() => {
+                          triggerHaptic('light');
+                          handleLogin();
+                          setIsSettingsOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <CalendarIcon className="w-4 h-4 text-black/60 dark:text-white/60" />
+                        <span className="text-[0.8125rem] font-semibold text-black/80 dark:text-white/80">
+                          Takvim'e Bağlan
+                        </span>
+                      </button>
+                    )}
                     <div className="h-[1px] bg-black/5 dark:bg-white/5 my-1 mx-2" />
                     <button
                       onClick={() => {

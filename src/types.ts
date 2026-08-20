@@ -44,6 +44,7 @@ export interface Task {
   subtasks?: SubTask[];
   reminders?: { offset: number; notified?: boolean }[];
   attachments?: Attachment[];
+  googleEventId?: string;
 }
 
 export type CanvasNodeKind = 'task' | 'note' | 'milestone' | 'file' | 'link' | 'checklist' | 'decision' | 'frame';

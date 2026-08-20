@@ -29,10 +29,11 @@ service cloud.firestore {
         && data.color is string && data.color.size() <= 20
         && data.type is string && data.type.size() <= 20
         && data.completed is bool
-        && ( !data.keys().hasAny(['locationName']) || (data.locationName is string && data.locationName.size() <= 200) )
+        && ( !data.keys().hasAny(['locationName']) || data.locationName == null || (data.locationName is string && data.locationName.size() <= 200) )
         && ( !data.keys().hasAny(['subtasks']) || data.subtasks is list )
         && ( !data.keys().hasAny(['reminders']) || data.reminders is list )
         && ( !data.keys().hasAny(['attachments']) || data.attachments is list )
+        && ( !data.keys().hasAny(['googleEventId']) || data.googleEventId == null || (data.googleEventId is string && data.googleEventId.size() <= 200) )
         && data.ownerId is string && data.ownerId == request.auth.uid
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -40,9 +41,9 @@ service cloud.firestore {
 
     // Users Collection (Tasks Subcollection)
     match /users/{userId}/tasks/{taskId} {
-      allow get: if isSignedIn() && request.auth.uid == userId && existing().ownerId == request.auth.uid;
+      allow get: if isSignedIn() && request.auth.uid == userId;
       
-      allow list: if isSignedIn() && request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      allow list: if isSignedIn() && request.auth.uid == userId;
       
       allow create: if isSignedIn() 
         && request.auth.uid == userId
@@ -58,7 +59,7 @@ service cloud.firestore {
         && incoming().ownerId == existing().ownerId // Immutable
         && incoming().createdAt == existing().createdAt // Immutable
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'dueDate', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt', 'isAllDay', 'importance', 'inbox', 'rolloverCount', 'reminders', 'attachments']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'dueDate', 'startTime', 'endTime', 'duration', 'color', 'type', 'completed', 'locationName', 'subtasks', 'updatedAt', 'isAllDay', 'importance', 'inbox', 'rolloverCount', 'reminders', 'attachments', 'googleEventId']);
         
       allow delete: if isSignedIn() 
         && request.auth.uid == userId 
