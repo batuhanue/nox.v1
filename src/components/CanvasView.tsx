@@ -512,7 +512,10 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
       });
       
       try {
-        await setDoc(docRef, { nodes: cleanNodes, edges }, { merge: true });
+        // Strip undefined values using JSON parse/stringify
+        const sanitizedNodes = JSON.parse(JSON.stringify(cleanNodes));
+        const sanitizedEdges = JSON.parse(JSON.stringify(edges));
+        await setDoc(docRef, { nodes: sanitizedNodes, edges: sanitizedEdges }, { merge: true });
         console.log("Canvas saved to Firestore");
       } catch (err) {
         console.error("Error saving canvas", err);
@@ -1066,6 +1069,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
         <ReactFlow
           nodes={syncedNodes}
           edges={processedEdges}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange as any}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}

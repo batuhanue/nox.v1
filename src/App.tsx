@@ -1,3 +1,4 @@
+import { EmailDetailModal } from './components/EmailDetailModal';
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun, Bot, MessageCircle, CloudRain, CloudSnow, CloudLightning, Cloud, Loader2, Inbox, LayoutDashboard, ListTodo , User as UserIcon, Mail } from "lucide-react";
 import { mockTasks, mockSchedules } from "./data";
@@ -349,6 +350,7 @@ export function getWeatherConfig(code: number, isDay: number) {
 
 
 function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, gmailToken, gmailEmails, isFetchingEmails, handleGmailLogin, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, gmailToken: string | null, gmailEmails: any[], isFetchingEmails: boolean, handleGmailLogin: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const today = new Date();
   const dayNum = today.getDate();
   const monthName = today.toLocaleDateString("tr-TR", { month: "long" }).toUpperCase();
@@ -479,7 +481,7 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
               ) : gmailEmails.length > 0 ? (
                 <div className="flex flex-col gap-3">
                   {gmailEmails.map((email: any) => (
-                    <div key={email.id} className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                    <div key={email.id} onClick={() => { triggerHaptic('light'); setSelectedEmailId(email.id); }} className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer">
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-[0.8125rem] font-bold text-black/90 dark:text-white/90 line-clamp-1">{email.from}</span>
                       </div>
@@ -526,8 +528,10 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
                 </AnimatePresence>
               </div>
             </div>
-          </div>
-        )}
+      
+    </div>
+  )
+}
 
         <div className="mb-14">
           <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Bugünün Odağı</h2>
@@ -594,6 +598,13 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
           </div>
         </div>
       </div>
+      <EmailDetailModal 
+        isOpen={!!selectedEmailId} 
+        onClose={() => setSelectedEmailId(null)} 
+        emailId={selectedEmailId} 
+        gmailToken={gmailToken}
+        triggerHaptic={(type) => {}} 
+      />
     </div>
   );
 }
@@ -959,7 +970,7 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
       </div>
         
 
-        <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
+        
       </div>
     </div>
   );
@@ -1783,9 +1794,10 @@ export default function App() {
                           ))}
                           
       </div>
-                        
-      </div>
-                    )}
+      
+    </div>
+  )
+}
                     
                     {selectedTask.attachments && selectedTask.attachments.length > 0 && (
                       <div className="mt-2 bg-black/5 rounded-2xl p-4">
@@ -1816,9 +1828,10 @@ export default function App() {
                           ))}
                           
       </div>
-                        
-      </div>
-                    )}
+      
+    </div>
+  )
+}
                     
       </div>
                   
