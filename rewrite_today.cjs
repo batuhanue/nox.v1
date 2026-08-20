@@ -1,0 +1,267 @@
+const fs = require('fs');
+
+let code = fs.readFileSync('src/App.tsx', 'utf8');
+
+const todayViewStr = `
+function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, gmailToken, gmailEmails, isFetchingEmails, handleGmailLogin, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, gmailToken: string | null, gmailEmails: any[], isFetchingEmails: boolean, handleGmailLogin: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
+  const today = new Date();
+  const dayNum = today.getDate();
+  const monthName = today.toLocaleDateString("tr-TR", { month: "long" }).toUpperCase();
+  const todayStr = getLocalISODate(today);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = getLocalISODate(tomorrow);
+
+  // Calculate week chart data
+  const getWeekDays = () => {
+    const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday);
+    
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  };
+
+  const weekDates = getWeekDays();
+  const maxHoursPerDay = 8; // 8-hour workday is 100%
+
+  const weekData = weekDates.map((date, i) => {
+    const dateStr = getLocalISODate(date);
+    const dayTasks = tasks.filter(t => t.date === dateStr);
+    
+    // Calculate total hours for the day based on the duration string (e.g. "5 Sa", "1 Sa 30 Dk")
+    const totalHours = dayTasks.reduce((acc, task) => {
+      let hours = 0;
+      if (task.duration) {
+        const hoursMatch = task.duration.match(/(\\d+)\\s*Sa/i);
+        const minsMatch = task.duration.match(/(\\d+)\\s*Dk/i);
+        
+        if (hoursMatch) hours += parseInt(hoursMatch[1], 10);
+        if (minsMatch) hours += parseInt(minsMatch[1], 10) / 60;
+      }
+      return acc + hours;
+    }, 0);
+
+    return { totalHours };
+  });
+
+  const totalWeekHours = weekData.reduce((acc, curr) => acc + curr.totalHours, 0);
+  const overallPercentage = Math.round(Math.min((totalWeekHours / (5 * maxHoursPerDay)) * 100, 100));
+
+  const totalBlocks = 10;
+  const filledBlocks = Math.round((overallPercentage / 100) * totalBlocks);
+  const emptyBlocks = totalBlocks - filledBlocks;
+
+  const inboxCount = tasks.filter(t => t.inbox && !t.completed).length;
+  
+  const todayTasks = tasks.filter(t => t.date === todayStr && !t.inbox);
+  const overdueTasks = tasks.filter(t => !t.completed && !t.inbox && t.date && t.date < todayStr);
+
+  const focusTasks = [...todayTasks].filter(t => !t.completed).sort((a, b) => (b.importance === 'critical' ? 2 : b.importance === 'important' ? 1 : 0) - (a.importance === 'critical' ? 2 : a.importance === 'important' ? 1 : 0)).slice(0, 3);
+  
+  const programTasks = todayTasks.filter(t => !t.completed && !!t.startTime).sort((a, b) => a.startTime!.localeCompare(b.startTime!));
+  
+  const freeTasks = todayTasks.filter(t => !t.completed && !t.startTime);
+
+  return (
+    <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+      <div className="relative w-full flex flex-col items-center pt-10">
+        <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col relative" style={{ zIndex: 10 }}>
+          <div className="flex flex-col mb-10 md:mb-16 gap-3">
+            <div className="flex flex-col items-start gap-2">
+              <h1 className={\`text-3xl md:text-4xl font-bold tracking-tight uppercase flex flex-col md:flex-row md:items-center gap-2 md:gap-3 transition-colors \${weather ? (weather.isDay ? "text-[#1a1a1a] drop-shadow-md" : "text-white drop-shadow-md") : "text-black dark:text-white"}\`}>
+                <span>{dayNum} {monthName}</span>
+                {!weather ? (
+                  <button 
+                    onClick={() => fetchWeather()}
+                    disabled={weatherLoading}
+                    className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black hover:bg-black/10 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                    title="Hava Durumu"
+                  >
+                    {weatherLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <div className={\`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md self-start md:self-auto \${weather.isDay ? "bg-white/30" : "bg-black/30"}\`}>
+                    {(() => {
+                      const Icon = getWeatherConfig(weather.code, weather.isDay).icon;
+                      return <Icon className={\`w-4 h-4 \${weather.isDay ? "text-black/80" : "text-white/90"}\`} />;
+                    })()}
+                    <span className={\`text-sm font-bold \${weather.isDay ? "text-black/80" : "text-white/90"}\`}>{weather.temp}°</span>
+                  </div>
+                )}
+              </h1>
+              <div className="flex flex-col scale-90 origin-left md:scale-100 mt-1 md:mt-2">
+                <h2 className={\`text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest mb-2 transition-colors \${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}\`}>
+                  Haftalık Yoğunluk
+                </h2>
+                <div className="flex gap-1">
+                  {Array.from({ length: filledBlocks }).map((_, i) => (
+                    <div key={\`filled-\${i}\`} className={\`w-5 h-2 rounded-sm transition-colors \${weather ? (weather.isDay ? "bg-black/40" : "bg-white/40") : "bg-black/20 dark:bg-white/20"}\`} />
+                  ))}
+                  {Array.from({ length: emptyBlocks }).map((_, i) => (
+                    <div key={\`empty-\${i}\`} className={\`w-5 h-2 rounded-sm transition-colors \${weather ? (weather.isDay ? "bg-black/10" : "bg-white/10") : "bg-black/5 dark:bg-white/5"}\`} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mb-14">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-black/40 dark:text-white/40" />
+                <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Gelen Kutusu (Gmail)</h2>
+              </div>
+              {!gmailToken && (
+                <button
+                  onClick={handleGmailLogin}
+                  className="text-[0.625rem] font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors text-black/80 dark:text-white/80"
+                >
+                  Bağlan
+                </button>
+              )}
+            </div>
+            
+            {gmailToken ? (
+              isFetchingEmails ? (
+                <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 flex justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-black/40 dark:text-white/40" />
+                </div>
+              ) : gmailEmails.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {gmailEmails.map((email: any) => (
+                    <div key={email.id} className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-[0.8125rem] font-bold text-black/90 dark:text-white/90 line-clamp-1">{email.from}</span>
+                      </div>
+                      <span className="text-[0.875rem] font-semibold text-black/80 dark:text-white/80 line-clamp-1">{email.subject}</span>
+                      <span className="text-[0.8125rem] text-black/50 dark:text-white/50 line-clamp-2 mt-1 leading-snug">{email.snippet}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 text-sm font-medium text-black/50 dark:text-white/50 text-center">
+                  Son e-posta bulunamadı.
+                </div>
+              )
+            ) : (
+              <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 text-sm font-medium text-black/50 dark:text-white/50 text-center">
+                Gelen son e-postalarınızı görmek için Gmail'e bağlanın.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col mt-4">
+        {overdueTasks.length > 0 && (
+          <div className="mb-14">
+            <h2 className="text-[0.6875rem] font-bold text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+               Gecikenler
+            </h2>
+            <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+              <div className="flex flex-col gap-3">
+                <AnimatePresence mode="popLayout">
+                  {overdueTasks.map(t => (
+                    <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-center justify-between group">
+                       <div className="flex flex-col">
+                         <span onClick={() => onTaskClick(t)} className="text-red-500 font-semibold text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity">{t.title}</span>
+                         <span className="text-[0.6875rem] font-medium text-red-500/60 mt-0.5">{t.date}</span>
+                       </div>
+                       <button onClick={() => updateTask(t.id, { date: todayStr })} className="text-[0.625rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">
+                         Bugüne Taşı
+                       </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Bugünün Odağı</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-4">
+              <AnimatePresence mode="popLayout">
+                {focusTasks.map((t, i) => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-4 cursor-pointer group">
+                    <span className="text-black/30 dark:text-white/30 font-bold mt-0.5">{i + 1}</span>
+                    <span className="text-black dark:text-white font-semibold text-lg leading-tight group-hover:opacity-70 transition-opacity">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {focusTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Odak belirlenmedi</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Program</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-4">
+              <AnimatePresence mode="popLayout">
+                {programTasks.map(t => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-5 cursor-pointer group">
+                    <span className="text-black/40 dark:text-white/40 font-bold w-12 text-sm shrink-0 mt-0.5 tracking-wide">{t.startTime}</span>
+                    <span className="text-black dark:text-white font-medium text-[15px] group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {programTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Program boş</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Serbest Görevler</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-3">
+              <AnimatePresence mode="popLayout">
+                {freeTasks.map(t => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-start gap-3 group">
+                    <button onClick={() => { triggerHaptic('success'); toggleTask(t.id, t.completed); }} className="mt-0.5 shrink-0">
+                      <div className="w-5 h-5 border-2 border-black/20 dark:border-white/20 rounded-[6px] hover:border-black/40 dark:hover:border-white/40 transition-colors" />
+                    </button>
+                    <span onClick={() => onTaskClick(t)} className="text-black dark:text-white font-medium text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {freeTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Serbest görev yok</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Aklımda</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div 
+              onClick={() => { triggerHaptic('light'); setView('inbox'); }}
+              className="flex items-center gap-3 cursor-pointer group bg-black/5 dark:bg-white/5 p-4 rounded-2xl hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <span className="text-black/60 dark:text-white/60 font-medium text-[15px]">{inboxCount} Inbox öğesi</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+`;
+
+const lines = code.split('\n');
+const startIdx = lines.findIndex(l => l.startsWith('function TodayView'));
+const endIdx = lines.findIndex(l => l.startsWith('function CalendarView'));
+
+if (startIdx !== -1 && endIdx !== -1) {
+  const newCode = lines.slice(0, startIdx).join('\n') + '\n' + todayViewStr + '\n' + lines.slice(endIdx).join('\n');
+  fs.writeFileSync('src/App.tsx', newCode);
+  console.log("Rewrote TodayView successfully");
+} else {
+  console.log("Could not find TodayView or CalendarView boundaries.");
+}

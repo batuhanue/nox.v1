@@ -466,6 +466,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
   const [projectGoal, setProjectGoal] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   
   // Load canvas state for specific project
@@ -481,32 +482,45 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
         if (data.edges) setEdges(data.edges);
         if (data.goal) setProjectGoal(data.goal);
       }
+      setIsLoaded(true);
     };
     loadCanvas();
   }, [projectId]);
 
-  // Save canvas state
-  const saveCanvas = useCallback(async (n: Node[], e: Edge[]) => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const docRef = doc(db, `users/${user.uid}/projects/${projectId}`);
-    const cleanNodes = n.map(node => {
-      const cleanData: any = { ...node.data };
-      delete cleanData.task;
-      delete cleanData.onTaskClick;
-      delete cleanData.onChange;
+  // Use an effect to auto-save when nodes/edges change, debounced
+  useEffect(() => {
+    if (!auth.currentUser || !projectId || !isLoaded) return;
+    
+    const timer = setTimeout(async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const docRef = doc(db, `users/${user.uid}/projects/${projectId}`);
+      const cleanNodes = nodes.map(node => {
+        const cleanData: any = { ...node.data };
+        delete cleanData.task;
+        delete cleanData.onTaskClick;
+        delete cleanData.onChange;
+        
+        return {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          width: node.width,
+          height: node.height,
+          data: cleanData
+        };
+      });
       
-      return {
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        width: node.width,
-        height: node.height,
-        data: cleanData
-      };
-    });
-    await setDoc(docRef, { nodes: cleanNodes, edges: e }, { merge: true });
-  }, [projectId]);
+      try {
+        await setDoc(docRef, { nodes: cleanNodes, edges }, { merge: true });
+        console.log("Canvas saved to Firestore");
+      } catch (err) {
+        console.error("Error saving canvas", err);
+      }
+    }, 1000); // 1s debounce
+    
+    return () => clearTimeout(timer);
+  }, [nodes, edges, projectId]);
 
   const saveGoal = async (goal: string) => {
     setProjectGoal(goal);
@@ -559,12 +573,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
     return {
       ...node,
       data: { ...data, kind, onChange: (newData: any) => {
-        setNodes(nds => {
-          const newNodes = nds.map(n => n.id === node.id ? { ...n, data: { ...n.data, ...newData } } : n);
-          // Manually trigger save here since we bypassed onNodesChange
-          saveCanvas(newNodes, edges);
-          return newNodes;
-        });
+        setNodes(nds => nds.map(n => n.id === node.id ? { ...n, data: { ...n.data, ...newData } } : n));
       }}
     };
   });
@@ -612,11 +621,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
         ...edge.data,
         isCompleted,
         onChangeType: (edgeId: string, type: string) => {
-          setEdges(eds => {
-            const newEdges = eds.map(e => e.id === edgeId ? { ...e, data: { ...e.data, relationship: type } } : e);
-            saveCanvas(nodes, newEdges);
-            return newEdges;
-          });
+          setEdges(eds => eds.map(e => e.id === edgeId ? { ...e, data: { ...e.data, relationship: type } } : e));
         }
       },
       style: {
@@ -628,36 +633,24 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      setNodes((nds) => {
-        const newNodes = applyNodeChanges(changes, nds);
-        saveCanvas(newNodes, edges);
-        return newNodes;
-      });
+      setNodes((nds) => applyNodeChanges(changes, nds));
     },
-    [edges, saveCanvas]
+    []
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      setEdges((eds) => {
-        const newEdges = applyEdgeChanges(changes, eds);
-        saveCanvas(nodes, newEdges);
-        return newEdges;
-      });
+      setEdges((eds) => applyEdgeChanges(changes, eds));
     },
-    [nodes, saveCanvas]
+    []
   );
 
   const onConnect = useCallback(
     (params: Connection) => {
       triggerHaptic('light');
-      setEdges((eds) => {
-        const newEdges = addEdge({ ...params, type: 'customEdge' }, eds);
-        saveCanvas(nodes, newEdges);
-        return newEdges;
-      });
+      setEdges((eds) => addEdge({ ...params, type: 'customEdge' }, eds));
     },
-    [nodes, saveCanvas]
+    []
   );
 
   const addNodeToCanvas = useCallback((payload: any, position: { x: number, y: number }) => {
@@ -729,13 +722,9 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
       return;
     }
 
-    setNodes((nds) => {
-      const newNodes = nds.concat(newNode);
-      saveCanvas(newNodes, edges);
-      return newNodes;
-    });
+    setNodes((nds) => nds.concat(newNode));
     triggerHaptic('success');
-  }, [nodes, edges, saveCanvas]);
+  }, [nodes]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();

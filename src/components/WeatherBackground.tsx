@@ -217,53 +217,6 @@ export function WeatherBackground({ weatherCode, isDay }: { weatherCode: number,
         <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: '26px', background: 'repeating-linear-gradient(92deg,rgba(255,255,255,.10) 0 3px,rgba(0,0,0,.06) 3px 7px)', animation: 'grasswave 7s ease-in-out infinite', transformOrigin: 'bottom center' }} />
       </div>
 
-      {/* Character */}
-      <div style={{ position: 'absolute', right: 'clamp(8px,5vw,104px)', bottom: p.outfit === 'rain' ? '28%' : '36%', animation: 'walkin 1.4s cubic-bezier(.22,.7,.2,1) both', transition: 'bottom 1.5s ease-in-out' }}>
-        <div style={{ animation: p.outfit === 'snow' ? 'shiver .5s ease-in-out infinite' : 'bob 5.5s ease-in-out infinite' }}>
-          <svg viewBox="0 0 240 400" style={{ overflow: 'visible', display: 'block', width: 'clamp(92px,22vw,142px)', height: 'auto' }}>
-            <ellipse cx="122" cy="386" rx="52" ry="9" fill="rgba(20,40,55,.20)" />
-            <g style={{ transition: 'fill 1.5s ease' }}>
-              <path d="M104 250 L100 372 L118 372 L124 254 Z" fill={o.pants} style={transStyle} />
-              <path d="M128 250 L138 370 L156 368 L142 252 Z" fill={o.pantsDark} style={transStyle} />
-              <rect x="96" y="368" width="26" height="12" rx="5" fill={o.shoe} style={transStyle} />
-              <rect x="134" y="362" width="28" height="12" rx="5" fill={o.shoe} style={transStyle} />
-              <path d="M100 152 q30 -14 54 2 l10 106 q-38 12 -70 -2 Z" fill={o.shirt} style={transStyle} />
-              <path d="M154 154 q16 24 14 62 l-16 4 q0 -40 -8 -60 Z" fill={o.shirtDark} style={transStyle} />
-              <g style={{ ...armStyle, transition: 'transform 1.5s ease' }}>
-                <rect x="106" y="168" width="17" height="86" rx="8.5" fill={o.skin} style={transStyle} />
-                <rect x="106" y="168" width="17" height="40" rx="8.5" fill={o.shirt} style={transStyle} />
-              </g>
-              <rect x="140" y="170" width="16" height="82" rx="8" fill={o.skin} style={{ transformOrigin: '148px 178px', animation: 'breathe 5s ease-in-out infinite reverse', ...transStyle }} />
-              <rect x="112" y="96" width="42" height="62" rx="21" fill={o.skin} style={transStyle} />
-              <path d="M110 126 q-6 -34 22 -38 q30 -4 32 30 q-14 -14 -30 -12 q-16 2 -24 20 Z" fill={o.hair} style={transStyle} />
-              {o.cap_on && (
-                <>
-                  <path d="M106 112 q4 -30 32 -30 q28 0 30 28 q-32 -8 -62 2 Z" fill={o.cap} style={transStyle} />
-                  <path d="M104 112 q-16 2 -20 12 q22 4 24 -2 Z" fill={o.cap} style={transStyle} />
-                </>
-              )}
-              {p.outfit === 'snow' && (
-                <>
-                  <path d="M108 116 q0 -34 30 -34 q30 0 30 34 q-30 -8 -60 0 Z" fill={o.cap} style={transStyle} />
-                  <rect x="106" y="112" width="64" height="14" rx="7" fill={o.capBand} style={transStyle} />
-                  <circle cx="138" cy="76" r="9" fill={o.capBand} style={transStyle} />
-                  <path d="M104 152 q34 16 58 2 l2 16 q-30 14 -62 -2 Z" fill={o.accent} style={transStyle} />
-                  <path d="M108 168 q-10 22 -4 44 l16 -4 q-6 -20 0 -38 Z" fill={o.accent} style={{ animation: 'sway 3.4s ease-in-out infinite', transformOrigin: 'top center', ...transStyle }} />
-                </>
-              )}
-            </g>
-            {p.outfit === 'rain' && (
-              <g transform="translate(0,34)" style={{ animation: 'sway 4.2s ease-in-out infinite', transformOrigin: '118px 94px' }}>
-                <rect x="114" y="52" width="5" height="150" rx="2.5" fill="#3d4a56" />
-                <path d="M28 62 q88 -74 180 0 q-40 -20 -60 -2 q-30 -22 -60 2 q-28 -18 -60 0 Z" fill={o.accent} style={transStyle} />
-                <path d="M28 62 q34 -14 60 0 q30 -20 60 -2 q22 -18 60 0" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="2" />
-                <path d="M112 200 q0 16 14 14" fill="none" stroke="#3d4a56" strokeWidth="5" strokeLinecap="round" />
-              </g>
-            )}
-          </svg>
-        </div>
-      </div>
-
       {/* Particles */}
       {p.rain && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>

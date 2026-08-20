@@ -39,7 +39,13 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
     // Users Collection (Tasks Subcollection)
+
     match /users/{userId}/tasks/{taskId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
       

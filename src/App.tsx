@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun, Bot, MessageCircle, CloudRain, CloudSnow, CloudLightning, Cloud, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun, Bot, MessageCircle, CloudRain, CloudSnow, CloudLightning, Cloud, Loader2, Inbox, LayoutDashboard, ListTodo , User as UserIcon, Mail } from "lucide-react";
 import { mockTasks, mockSchedules } from "./data";
 import { Task, DaySchedule } from "./types";
 import { motion, AnimatePresence, useDragControls, useReducedMotion } from "motion/react";
@@ -14,6 +14,7 @@ import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
 import { syncGoogleCalendar, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "./lib/googleCalendar";
 import { WeatherBackground } from "./components/WeatherBackground";
+import { MobileDock } from "./components/MobileDock";
 
 export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning') => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -214,9 +215,11 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
                     Bitiş: {task.dueDate}
                   </span>
                 )}
-              </div>
+                
+      </div>
             )}
-          </div>
+            
+      </div>
           <div className="flex flex-col items-end shrink-0 ml-4">
             <div className="flex -space-x-2 shrink-0">
               {(task.attendees || []).map((a, i) => (
@@ -228,42 +231,54 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
                   style={{ zIndex: 10 - i }}
                 />
               ))}
-            </div>
-          </div>
-        </div>
+              
+      </div>
+            
+      </div>
+          
+      </div>
         <div className="flex items-end justify-between mt-8 pointer-events-none">
           {task.isAllDay ? (
             <div>
               <div className="text-[0.8125rem] font-bold text-black/80 tracking-wide">Tüm Gün</div>
               <div className="text-[0.625rem] text-black/50 font-bold uppercase mt-1 tracking-wider">Planlandı</div>
-            </div>
+              
+      </div>
           ) : (
             <>
               <div>
                 <div className="text-[0.8125rem] font-bold text-black/80 tracking-wide">
                   {task.startTime || '-'}
-                </div>
+                  
+      </div>
                 <div className="text-[0.625rem] text-black/50 font-bold uppercase mt-1 tracking-wider">
                   Başlangıç
-                </div>
-              </div>
+                  
+      </div>
+                
+      </div>
               <div
                 className="text-white text-[0.6875rem] px-3.5 py-1.5 rounded-full font-bold tracking-wide"
                 style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
               >
                 {task.duration || '-'}
-              </div>
+                
+      </div>
               <div className="text-right">
                 <div className="text-[0.8125rem] font-bold text-black/80 tracking-wide">
                   {task.endTime || '-'}
-                </div>
+                  
+      </div>
                 <div className="text-[0.625rem] text-black/50 font-bold uppercase mt-1 tracking-wider">
                   Bitiş
-                </div>
-              </div>
+                  
+      </div>
+                
+      </div>
             </>
           )}
-        </div>
+          
+      </div>
         
         {(task.subtasks && task.subtasks.length > 0 || task.attachments && task.attachments.length > 0) && (
           <div className="mt-4 pt-4 border-t border-black/10 flex items-center justify-between">
@@ -273,7 +288,8 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
                 <span className="text-[0.6875rem] font-bold text-black/60 uppercase tracking-widest">
                   {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} Alt Görev
                 </span>
-              </div>
+                
+      </div>
             ) : <div />}
             
             {task.attachments && task.attachments.length > 0 && (
@@ -282,9 +298,11 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
                 <span className="text-[0.6875rem] font-bold uppercase tracking-widest">
                   {task.attachments.length} Dosya
                 </span>
-              </div>
+                
+      </div>
             )}
-          </div>
+            
+      </div>
         )}
       </motion.div>
     </motion.div>
@@ -329,10 +347,8 @@ export function getWeatherConfig(code: number, isDay: number) {
     };
 }
 
-function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, aiRecommendation, isAiLoading, getAiRecommendation, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, aiRecommendation: string | null, isAiLoading: boolean, getAiRecommendation: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
-  
-  
 
+function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, gmailToken, gmailEmails, isFetchingEmails, handleGmailLogin, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, gmailToken: string | null, gmailEmails: any[], isFetchingEmails: boolean, handleGmailLogin: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
   const today = new Date();
   const dayNum = today.getDate();
   const monthName = today.toLocaleDateString("tr-TR", { month: "long" }).toUpperCase();
@@ -399,179 +415,185 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
   return (
     <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
       <div className="relative w-full flex flex-col items-center pt-10">
-        
         <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col relative" style={{ zIndex: 10 }}>
+          <div className="flex flex-col mb-10 md:mb-16 gap-3">
+            <div className="flex flex-col items-start gap-2">
+              <h1 className={`text-3xl md:text-4xl font-bold tracking-tight uppercase flex flex-col md:flex-row md:items-center gap-2 md:gap-3 transition-colors ${weather ? (weather.isDay ? "text-[#1a1a1a] drop-shadow-md" : "text-white drop-shadow-md") : "text-black dark:text-white"}`}>
+                <span>{dayNum} {monthName}</span>
+                {!weather ? (
+                  <button 
+                    onClick={() => fetchWeather()}
+                    disabled={weatherLoading}
+                    className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black hover:bg-black/10 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                    title="Hava Durumu"
+                  >
+                    {weatherLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md self-start md:self-auto ${weather.isDay ? "bg-white/30" : "bg-black/30"}`}>
+                    {(() => {
+                      const Icon = getWeatherConfig(weather.code, weather.isDay).icon;
+                      return <Icon className={`w-4 h-4 ${weather.isDay ? "text-black/80" : "text-white/90"}`} />;
+                    })()}
+                    <span className={`text-sm font-bold ${weather.isDay ? "text-black/80" : "text-white/90"}`}>{weather.temp}°</span>
+                  </div>
+                )}
+              </h1>
+              <div className="flex flex-col scale-90 origin-left md:scale-100 mt-1 md:mt-2">
+                <h2 className={`text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest mb-2 transition-colors ${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}`}>
+                  Haftalık Yoğunluk
+                </h2>
+                <div className="flex gap-1">
+                  {Array.from({ length: filledBlocks }).map((_, i) => (
+                    <div key={`filled-${i}`} className={`w-5 h-2 rounded-sm transition-colors ${weather ? (weather.isDay ? "bg-black/40" : "bg-white/40") : "bg-black/20 dark:bg-white/20"}`} />
+                  ))}
+                  {Array.from({ length: emptyBlocks }).map((_, i) => (
+                    <div key={`empty-${i}`} className={`w-5 h-2 rounded-sm transition-colors ${weather ? (weather.isDay ? "bg-black/10" : "bg-white/10") : "bg-black/5 dark:bg-white/5"}`} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mb-14">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-black/40 dark:text-white/40" />
+                <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Gelen Kutusu (Gmail)</h2>
+              </div>
+              {!gmailToken && (
+                <button
+                  onClick={handleGmailLogin}
+                  className="text-[0.625rem] font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors text-black/80 dark:text-white/80"
+                >
+                  Bağlan
+                </button>
+              )}
+            </div>
+            
+            {gmailToken ? (
+              isFetchingEmails ? (
+                <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 flex justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-black/40 dark:text-white/40" />
+                </div>
+              ) : gmailEmails.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {gmailEmails.map((email: any) => (
+                    <div key={email.id} className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-[0.8125rem] font-bold text-black/90 dark:text-white/90 line-clamp-1">{email.from}</span>
+                      </div>
+                      <span className="text-[0.875rem] font-semibold text-black/80 dark:text-white/80 line-clamp-1">{email.subject}</span>
+                      <span className="text-[0.8125rem] text-black/50 dark:text-white/50 line-clamp-2 mt-1 leading-snug">{email.snippet}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 text-sm font-medium text-black/50 dark:text-white/50 text-center">
+                  Son e-posta bulunamadı.
+                </div>
+              )
+            ) : (
+              <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 text-sm font-medium text-black/50 dark:text-white/50 text-center">
+                Gelen son e-postalarınızı görmek için Gmail'e bağlanın.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       
-      <div className="flex flex-col mb-10 md:mb-16">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className={`text-3xl md:text-4xl font-bold tracking-tight uppercase flex items-center gap-3 transition-colors ${weather ? (weather.isDay ? "text-[#1a1a1a] drop-shadow-md" : "text-white drop-shadow-md") : "text-black dark:text-white"}`}>
-            {dayNum} {monthName}
-            {!weather ? (
-              <button 
-                onClick={() => fetchWeather()}
-                disabled={weatherLoading}
-                className="ml-2 w-8 h-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black hover:bg-black/10 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
-                title="Hava Durumu"
-              >
-                {weatherLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-              </button>
-            ) : (
-              <div className={`ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md ${weather.isDay ? "bg-white/30" : "bg-black/30"}`}>
-                {(() => {
-                  const Icon = getWeatherConfig(weather.code, weather.isDay).icon;
-                  return <Icon className={`w-4 h-4 ${weather.isDay ? "text-black/80" : "text-white/90"}`} />;
-                })()}
-                <span className={`text-sm font-bold ${weather.isDay ? "text-black/80" : "text-white/90"}`}>{weather.temp}°</span>
-              </div>
-            )}
-          </h1>
-        </div>
-
-        <div className="flex flex-col">
-          <h2 className={`text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest mb-2 transition-colors ${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}`}>
-            Haftalık Yoğunluk
-          </h2>
-          <div className="flex gap-1 sm:gap-1.5 items-center">
-            {Array.from({ length: filledBlocks }).map((_, i) => (
-              <div key={`filled-${i}`} className={`h-2 w-4 sm:h-3.5 sm:w-6 rounded-[2px] transition-colors ${weather ? (weather.isDay ? "bg-[#1a1a1a]/60" : "bg-white/60") : "bg-black/60 dark:bg-white/60"}`} />
-            ))}
-            {Array.from({ length: emptyBlocks }).map((_, i) => (
-              <div key={`empty-${i}`} className={`h-2 w-4 sm:h-3.5 sm:w-6 rounded-[2px] transition-colors ${weather ? (weather.isDay ? "bg-[#1a1a1a]/10" : "bg-white/10") : "bg-black/10 dark:bg-white/10"}`} />
-            ))}
-            <span className={`text-xs sm:text-sm font-bold ml-1.5 sm:ml-2 transition-colors ${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}`}>
-              % {overallPercentage}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {today.getDay() === 0 && (
-        <div className="mb-14">
-          <motion.div 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => { triggerHaptic('light'); setView('weekly-review'); }}
-            className="bg-black text-white dark:bg-white dark:text-black rounded-3xl p-6 flex items-center justify-between cursor-pointer"
-          >
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Pazar Günü Rutini</span>
-              <span className="text-xl font-bold tracking-tight">Haftalık Değerlendirme</span>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-white/10 dark:bg-black/10 flex items-center justify-center">
-              <ChevronRight className="w-5 h-5" />
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      <div className="mb-14">
-        <div className="flex items-center gap-2 mb-4">
-          <Bot className="w-4 h-4 text-black/40 dark:text-white/40" />
-          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Yapay Zeka Önerileri</h2>
-        </div>
-        {aiRecommendation ? (
-          <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 rounded-2xl p-5 text-sm text-black/80 dark:text-white/80 markdown-body prose-sm dark:prose-invert">
-            <Markdown>{aiRecommendation}</Markdown>
-          </div>
-        ) : (
-          <button
-            onClick={getAiRecommendation}
-            disabled={isAiLoading}
-            className="flex items-center justify-center gap-2 w-full py-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black/60 dark:text-white/60 rounded-2xl transition-colors font-medium text-sm disabled:opacity-50"
-          >
-            {isAiLoading ? (
-              <span className="animate-pulse">Analiz ediliyor...</span>
-            ) : (
-              <>Programımı Analiz Et</>
-            )}
-          </button>
-        )}
-      </div>
-
-              </div>
-      </div>
       <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col mt-4">
         {overdueTasks.length > 0 && (
+          <div className="mb-14">
+            <h2 className="text-[0.6875rem] font-bold text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+               Gecikenler
+            </h2>
+            <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+              <div className="flex flex-col gap-3">
+                <AnimatePresence mode="popLayout">
+                  {overdueTasks.map(t => (
+                    <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-center justify-between group">
+                       <div className="flex flex-col">
+                         <span onClick={() => onTaskClick(t)} className="text-red-500 font-semibold text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity">{t.title}</span>
+                         <span className="text-[0.6875rem] font-medium text-red-500/60 mt-0.5">{t.date}</span>
+                       </div>
+                       <button onClick={() => updateTask(t.id, { date: todayStr })} className="text-[0.625rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">
+                         Bugüne Taşı
+                       </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-14">
-          <h2 className="text-[0.6875rem] font-bold text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-             Gecikenler
-          </h2>
-          <div className="flex flex-col gap-3">
-            <AnimatePresence mode="popLayout">
-              {overdueTasks.map(t => (
-                <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-center justify-between group">
-                   <div className="flex flex-col">
-                     <span onClick={() => onTaskClick(t)} className="text-red-500 font-semibold text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity">{t.title}</span>
-                     <span className="text-[0.6875rem] font-medium text-red-500/60 mt-0.5">{t.date}</span>
-                   </div>
-                   <button onClick={() => updateTask(t.id, { date: todayStr })} className="text-[0.625rem] font-bold uppercase tracking-wider px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors">
-                     Bugüne Taşı
-                   </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Bugünün Odağı</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-4">
+              <AnimatePresence mode="popLayout">
+                {focusTasks.map((t, i) => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-4 cursor-pointer group">
+                    <span className="text-black/30 dark:text-white/30 font-bold mt-0.5">{i + 1}</span>
+                    <span className="text-black dark:text-white font-semibold text-lg leading-tight group-hover:opacity-70 transition-opacity">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {focusTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Odak belirlenmedi</span>}
+            </div>
           </div>
         </div>
-      )}
 
-      <div className="mb-14">
-        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Bugünün Odağı</h2>
-        <div className="flex flex-col gap-4">
-          <AnimatePresence mode="popLayout">
-            {focusTasks.map((t, i) => (
-              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-4 cursor-pointer group">
-                <span className="text-black/30 dark:text-white/30 font-bold mt-0.5">{i + 1}</span>
-                <span className="text-black dark:text-white font-semibold text-lg leading-tight group-hover:opacity-70 transition-opacity">{t.title}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          {focusTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Odak belirlenmedi</span>}
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Program</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-4">
+              <AnimatePresence mode="popLayout">
+                {programTasks.map(t => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-5 cursor-pointer group">
+                    <span className="text-black/40 dark:text-white/40 font-bold w-12 text-sm shrink-0 mt-0.5 tracking-wide">{t.startTime}</span>
+                    <span className="text-black dark:text-white font-medium text-[15px] group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {programTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Program boş</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-14">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Serbest Görevler</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex flex-col gap-3">
+              <AnimatePresence mode="popLayout">
+                {freeTasks.map(t => (
+                  <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-start gap-3 group">
+                    <button onClick={() => { triggerHaptic('success'); toggleTask(t.id, t.completed); }} className="mt-0.5 shrink-0">
+                      <div className="w-5 h-5 border-2 border-black/20 dark:border-white/20 rounded-[6px] hover:border-black/40 dark:hover:border-white/40 transition-colors" />
+                    </button>
+                    <span onClick={() => onTaskClick(t)} className="text-black dark:text-white font-medium text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {freeTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Serbest görev yok</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Aklımda</h2>
+          <div className="bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl p-5">
+            <div 
+              onClick={() => { triggerHaptic('light'); setView('inbox'); }}
+              className="flex items-center gap-3 cursor-pointer group bg-black/5 dark:bg-white/5 p-4 rounded-2xl hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <span className="text-black/60 dark:text-white/60 font-medium text-[15px]">{inboxCount} Inbox öğesi</span>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="mb-14">
-        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Program</h2>
-        <div className="flex flex-col gap-4">
-          <AnimatePresence mode="popLayout">
-            {programTasks.map(t => (
-              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-5 cursor-pointer group">
-                <span className="text-black/40 dark:text-white/40 font-bold w-12 text-sm shrink-0 mt-0.5 tracking-wide">{t.startTime}</span>
-                <span className="text-black dark:text-white font-medium text-[15px] group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          {programTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Program boş</span>}
-        </div>
-      </div>
-
-      <div className="mb-14">
-        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-5">Serbest Görevler</h2>
-        <div className="flex flex-col gap-3">
-          <AnimatePresence mode="popLayout">
-            {freeTasks.map(t => (
-              <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={t.id} className="flex items-start gap-3 group">
-                <button onClick={() => { triggerHaptic('success'); toggleTask(t.id, t.completed); }} className="mt-0.5 shrink-0">
-                  <div className="w-5 h-5 border-2 border-black/20 dark:border-white/20 rounded-[6px] hover:border-black/40 dark:hover:border-white/40 transition-colors" />
-                </button>
-                <span onClick={() => onTaskClick(t)} className="text-black dark:text-white font-medium text-[15px] cursor-pointer group-hover:opacity-70 transition-opacity leading-snug">{t.title}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          {freeTasks.length === 0 && <span className="text-black/30 dark:text-white/30 text-sm font-medium">Serbest görev yok</span>}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Aklımda</h2>
-        <div 
-          onClick={() => { triggerHaptic('light'); setView('inbox'); }}
-          className="flex items-center gap-3 cursor-pointer group bg-black/5 dark:bg-white/5 p-4 rounded-2xl hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-        >
-          <span className="text-black/60 dark:text-white/60 font-medium text-[15px]">{inboxCount} Inbox öğesi</span>
-        </div>
-      </div>
-    </div>
     </div>
   );
 }
@@ -629,7 +651,8 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
                 {formatMonth(currentDate)}
               </motion.span>
             </AnimatePresence>
-          </div>
+            
+      </div>
 
           <motion.button 
             whileTap={{ scale: 0.8 }}
@@ -640,10 +663,12 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
           >
             <ChevronRight className="w-5 h-5" strokeWidth={3} />
           </motion.button>
-        </div>
+          
+      </div>
         <span className="text-black/30 dark:text-white/30 font-semibold text-[1.0625rem] tracking-wide w-12 text-right cursor-pointer" onClick={() => setCurrentDate(nextMonth)}>
           {formatMonth(nextMonth)}
         </span>
+        
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -674,7 +699,8 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
                 <span className="text-[18px] font-bold text-black/40 leading-none uppercase tracking-wide">
                   {monthName}
                 </span>
-              </div>
+                
+      </div>
 
               <div className="flex-1 relative flex">
                 {/* Timeline lines */}
@@ -698,22 +724,29 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
                   {dayTasks.slice(0, 3).map((task) => (
                     <div key={task.id} className="bg-black text-white text-[0.625rem] px-2.5 py-1 rounded-full font-semibold tracking-wide truncate max-w-full">
                       {task.startTime} - {task.title.replace('\n', ' ')}
-                    </div>
+                      
+      </div>
                   ))}
                   {dayTasks.length > 3 && (
                     <div className="text-[0.625rem] font-bold text-black/50 pl-2">
                       +{dayTasks.length - 3} daha...
-                    </div>
+                      
+      </div>
                   )}
-                </div>
-              </div>
+                  
+      </div>
+                
+      </div>
             </motion.div>
           );
         })}
+        
       </div>
 
       {/* Day Details Modal */}
-      <AnimatePresence>
+      
+
+        <AnimatePresence>
         {selectedDate && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -736,18 +769,21 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
                     {selectedDate.getDate()} {selectedDate.toLocaleDateString("tr-TR", { month: "long" })}
                   </h3>
                   <p className="text-black/50 dark:text-white/50 font-medium capitalize">{selectedDate.toLocaleDateString("tr-TR", { weekday: "long" })}</p>
-                </div>
+                  
+      </div>
                 <button aria-label="Kapat" onClick={() => setSelectedDate(null)} className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition">
                   <X className="w-5 h-5" />
                 </button>
-              </div>
+                
+      </div>
 
               <div className="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-3 pb-8">
                 {selectedDateTasks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center flex-1 opacity-50">
                     <CalendarIcon className="w-12 h-12 mb-4 text-black/40 dark:text-white/40" />
                     <p className="font-medium text-black/60 dark:text-white/60 text-lg">Bu güne ait görev yok</p>
-                  </div>
+                    
+      </div>
                 ) : (
                   selectedDateTasks.map((task) => (
                     <motion.div 
@@ -775,12 +811,15 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (tas
                               style={{ zIndex: 10 - i }}
                             />
                           ))}
-                        </div>
-                      </div>
+                          
+      </div>
+                        
+      </div>
                     </motion.div>
                   ))
                 )}
-              </div>
+                
+      </div>
             </motion.div>
           </motion.div>
         )}
@@ -844,25 +883,31 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
         >
           <X className="w-6 h-6" />
         </button>
+        
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-12">
         <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
           <span className="text-4xl font-bold text-black dark:text-white mb-2">{totalPlanned}</span>
           <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Görev Planlandı</span>
-        </div>
+          
+      </div>
         <div className="bg-emerald-500/10 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
           <span className="text-4xl font-bold text-emerald-600 mb-2">{totalCompleted}</span>
           <span className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest">Tamamlandı</span>
-        </div>
+          
+      </div>
         <div className="bg-orange-500/10 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
           <span className="text-4xl font-bold text-orange-600 mb-2">{totalPostponed}</span>
           <span className="text-[10px] font-bold text-orange-600/60 uppercase tracking-widest">Kez Ertelendi</span>
-        </div>
+          
+      </div>
         <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl flex flex-col items-center justify-center text-center">
           <span className="text-xl font-bold text-black dark:text-white mb-2 capitalize">{busiestDayName}</span>
           <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">En Yoğun Gün</span>
-        </div>
+          
+      </div>
+        
       </div>
 
       {mostPostponed && (
@@ -870,7 +915,8 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
           <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-3">En Çok Ertelenen Görev</span>
           <span className="text-lg font-semibold text-black dark:text-white leading-tight">{mostPostponed.title}</span>
           <span className="text-xs font-bold text-orange-600 mt-2">{mostPostponed.rolloverCount} kez</span>
-        </div>
+          
+      </div>
       )}
 
       <div>
@@ -903,16 +949,22 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
                   >
                     Sil
                   </button>
-                </div>
+                  
+      </div>
               </motion.div>
             ))}
           </AnimatePresence>
           {remainingTasks.length === 0 && <span className="text-black/40 dark:text-white/40 text-sm font-medium text-center py-8">Kalan görev yok. Harika bir hafta!</span>}
-        </div>
+          
+      </div>
+        
+
+        <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
       </div>
     </div>
   );
 }
+
 
 export default function App() {
   const [view, setView] = useState<"inbox" | "today" | "calendar" | "kanvas" | "weekly-review">("today");
@@ -961,6 +1013,9 @@ export default function App() {
   };
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [gmailToken, setGmailToken] = useState<string | null>(null);
+  const [gmailEmails, setGmailEmails] = useState<any[]>([]);
+  const [isFetchingEmails, setIsFetchingEmails] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -970,6 +1025,15 @@ export default function App() {
   const prefersReducedMotion = useReducedMotion();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  const handleGmailError = (e: any) => {
+    console.error(e);
+    if (e?.message === '401_UNAUTHENTICATED' || e?.status === 401) {
+      setGmailToken(null);
+      if (user) {
+        setDoc(doc(db, 'users', user.uid), { gmailToken: null }, { merge: true });
+      }
+    }
+  };
   const handleGoogleError = (e: any) => {
     console.error(e);
     if (e?.message === '401_UNAUTHENTICATED') {
@@ -1020,6 +1084,9 @@ export default function App() {
     const unsubscribePrefs = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        if (data.gmailToken && data.gmailToken !== gmailToken) {
+           setGmailToken(data.gmailToken);
+        }
         if (data.googleCalendarToken && data.googleCalendarToken !== accessToken) {
            setAccessToken(data.googleCalendarToken);
         }
@@ -1062,6 +1129,63 @@ export default function App() {
       syncGoogleCalendar(accessToken, user.uid, tasks).catch(handleGoogleError);
     }
   }, [user, accessToken, tasks]); // Run when tasks populate, but only sync once per session
+
+  // Fetch Gmail emails
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    const fetchEmails = () => {
+      if (!gmailToken) return;
+      // Don't set isFetchingEmails to true on every interval to avoid UI flicker, only on initial load
+      // Or we can just let it fetch silently in the background
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=3', {
+        headers: { Authorization: `Bearer ${gmailToken}` }
+      })
+      .then(res => {
+        if (!res.ok) {
+          if (res.status === 401) throw new Error('401_UNAUTHENTICATED');
+          throw new Error('Failed to fetch messages');
+        }
+        return res.json();
+      })
+      .then(async data => {
+        if (data.messages && data.messages.length > 0) {
+          const emailPromises = data.messages.map((m: any) => 
+            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, {
+              headers: { Authorization: `Bearer ${gmailToken}` }
+            }).then(r => r.json())
+          );
+          const fullEmails = await Promise.all(emailPromises);
+          
+          const formattedEmails = fullEmails.map((email: any) => {
+            const subjectHeader = email.payload?.headers?.find((h: any) => h.name.toLowerCase() === 'subject');
+            const fromHeader = email.payload?.headers?.find((h: any) => h.name.toLowerCase() === 'from');
+            return {
+              id: email.id,
+              snippet: email.snippet,
+              subject: subjectHeader ? subjectHeader.value : '(Konu yok)',
+              from: fromHeader ? fromHeader.value.split('<')[0].trim() : 'Bilinmeyen'
+            };
+          });
+          setGmailEmails(formattedEmails);
+        } else {
+          setGmailEmails([]);
+        }
+      })
+      .catch(handleGmailError)
+      .finally(() => setIsFetchingEmails(false));
+    };
+
+    if (gmailToken) {
+      if (gmailEmails.length === 0) setIsFetchingEmails(true);
+      fetchEmails();
+      intervalId = setInterval(fetchEmails, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [gmailToken]);
 
   const toggleTask = async (id: string, current: boolean) => {
     if (!user) return;
@@ -1247,6 +1371,23 @@ export default function App() {
     }
   };
 
+  const handleGmailLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGmailToken(credential.accessToken);
+        if (auth.currentUser) {
+          setDoc(doc(db, 'users', auth.currentUser.uid), { gmailToken: credential.accessToken }, { merge: true });
+        }
+      }
+    } catch (error) {
+      console.error("Gmail Login Error:", error);
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -1270,7 +1411,9 @@ export default function App() {
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-12 h-12 rounded-full border-2 border-black border-t-transparent animate-spin mb-4" />
           <p className="font-medium text-black/40 tracking-wider text-sm uppercase">Yükleniyor...</p>
-        </div>
+          
+      </div>
+        
       </div>
     );
   }
@@ -1290,7 +1433,8 @@ export default function App() {
           >
             <div className="w-20 h-20 bg-black rounded-3xl shadow-xl flex items-center justify-center mb-8 rotate-3">
               <CalendarIcon className="w-10 h-10 text-white" strokeWidth={1.5} />
-            </div>
+              
+      </div>
             
             <h1 className="text-4xl font-semibold tracking-tight text-black mb-3">Tasks</h1>
             <p className="text-black/50 text-center text-[0.9375rem] max-w-[280px] mb-12 font-medium leading-relaxed">
@@ -1312,7 +1456,9 @@ export default function App() {
               Google ile Giriş Yap
             </motion.button>
           </motion.div>
-        </div>
+          
+      </div>
+        
       </div>
     );
   }
@@ -1322,8 +1468,8 @@ export default function App() {
       {(weather && view === "today") && <div className="fixed inset-0 w-screen h-screen pointer-events-none" style={{ zIndex: 0 }}><WeatherBackground weatherCode={weather.code} isDay={weather.isDay} /></div>}
       <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col relative" style={{ zIndex: 10 }}>
         {/* Header */}
-        <header className={`flex items-center justify-between px-6 md:px-10 pt-12 md:pt-10 pb-4 sticky top-0 z-20 backdrop-blur-xl border-b border-black/[0.03] dark:border-white/[0.03] transition-colors duration-300 ${(weather && view === "today") ? (weather.isDay ? "bg-white/30" : "bg-black/30") : "bg-[#f4f4f4]/80 dark:bg-[#121212]/80"}`}>
-          <div className="flex items-center bg-black/[0.06] dark:bg-white/[0.06] p-[3px] rounded-full relative">
+        <header className={`hidden md:flex items-center justify-between px-6 md:px-10 pt-12 md:pt-10 pb-4 sticky top-0 z-20 backdrop-blur-xl border-b border-black/[0.03] dark:border-white/[0.03] transition-colors duration-300 ${(weather && view === "today") ? (weather.isDay ? "bg-white/30" : "bg-black/30") : "bg-[#f4f4f4]/80 dark:bg-[#121212]/80"}`}>
+          <div className="hidden md:flex items-center bg-black/[0.06] dark:bg-white/[0.06] p-[3px] rounded-full relative">
             {(["inbox", "today", "calendar", "kanvas"] as const).map((tab) => (
               <button
                 key={tab}
@@ -1344,28 +1490,46 @@ export default function App() {
                 {tab === "inbox" ? "Inbox" : tab === "today" ? "Bugün" : tab === "calendar" ? "Takvim" : "Kanvas"}
               </button>
             ))}
-          </div>
+            
+      </div>
 
-          <div className="flex items-center gap-2 relative">
+          <div className="flex items-center gap-2 relative ml-auto md:ml-0">
             <motion.button 
               aria-label="Ayarlar"
               whileTap={{ scale: 0.88 }}
               onClick={() => { triggerHaptic('light'); setIsSettingsOpen(!isSettingsOpen); }}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition ${isSettingsOpen ? 'bg-black/10 dark:bg-white/10 text-black dark:text-white' : 'text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
             >
-              <Settings className="w-5 h-5" />
+              <UserIcon className="w-5 h-5" />
             </motion.button>
 
-            <AnimatePresence>
+            
+              <motion.button
+              aria-label="Yeni Görev Ekle"
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              onClick={() => { triggerHaptic('medium'); setIsAdding(true); }}
+              style={{ WebkitTapHighlightColor: "transparent" }}
+              className="w-10 h-10 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black shadow-sm relative z-40"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2.5} />
+            </motion.button>
+            
+      </div>
+        </header>
+        <MobileDock view={view} setView={setView} setIsAdding={setIsAdding} setIsSettingsOpen={setIsSettingsOpen} />
+
+        {/* Settings Modal - Moved out of hidden header */}
+        <AnimatePresence>
               {isSettingsOpen && (
                 <>
-                  <div className="fixed inset-0 z-30" onClick={() => setIsSettingsOpen(false)} />
+                  <div className="fixed inset-0 z-[60]" onClick={() => setIsSettingsOpen(false)} />
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
                     transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-                    className="absolute top-12 right-12 mt-2 w-48 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-xl border border-black/5 dark:border-white/5 p-2 z-40"
+                    className="fixed md:absolute md:top-12 md:right-12 bottom-28 left-1/2 -translate-x-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:mt-2 w-56 md:w-48 bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl rounded-2xl shadow-xl border border-black/5 dark:border-white/5 p-2 z-[70]"
                   >
                     <button
                       onClick={() => {
@@ -1408,7 +1572,8 @@ export default function App() {
                         <span className="text-[0.8125rem] font-semibold text-black/80 dark:text-white/80">
                           Bildirimler
                         </span>
-                      </div>
+                        
+      </div>
                       <span className={`text-[0.625rem] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                         notificationPermission === 'granted' 
                           ? 'bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60' 
@@ -1419,6 +1584,34 @@ export default function App() {
                     </button>
 
                     <div className="h-[1px] bg-black/5 dark:bg-white/5 my-1 mx-2" />
+
+                    <button
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setIsAiChatOpen(true);
+                        setIsSettingsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
+                    >
+                      <MessageCircle className="w-4 h-4 text-black/60 dark:text-white/60" />
+                      <span className="text-[0.8125rem] font-semibold text-black/80 dark:text-white/80">Yapay Zeka Sohbeti</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setView('kanvas');
+                        setIsSettingsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-black/60 dark:text-white/60" />
+                      <span className="text-[0.8125rem] font-semibold text-black/80 dark:text-white/80">Kanvas</span>
+                    </button>
+                    <div className="h-[1px] bg-black/5 dark:bg-white/5 my-1 mx-2" />
+
+
+                    
+
                     <button
                       onClick={() => {
                         triggerHaptic('light');
@@ -1435,19 +1628,6 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            <motion.button 
-              aria-label="Yeni Görev Ekle"
-              whileTap={{ scale: 0.88 }}
-              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-              onClick={() => { triggerHaptic('medium'); setIsAdding(true); }}
-              style={{ WebkitTapHighlightColor: "transparent" }}
-              className="w-10 h-10 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black shadow-sm relative z-40"
-            >
-              <Plus className="w-5 h-5" strokeWidth={2.5} />
-            </motion.button>
-          </div>
-        </header>
-
         {/* Content */}
         <main className="flex-1 pb-10">
           {view === "inbox" ? (
@@ -1460,20 +1640,21 @@ export default function App() {
             />
           ) : view === "today" ? (
             <TodayView 
-              tasks={tasks} 
-              toggleTask={toggleTask} 
-              deleteTask={deleteTask} 
+              tasks={tasks}
+              toggleTask={toggleTask}
+              deleteTask={deleteTask}
               updateTask={updateTask}
-              onTaskClick={setSelectedTask} 
+              onTaskClick={setSelectedTask}
               notificationPermission={notificationPermission}
               onRequestPermission={onRequestPermission}
               setView={setView}
               weather={weather}
               weatherLoading={weatherLoading}
               fetchWeather={fetchWeather}
-              aiRecommendation={aiRecommendation}
-              isAiLoading={isAiLoading}
-              getAiRecommendation={getAiRecommendation}
+              gmailToken={gmailToken}
+              gmailEmails={gmailEmails}
+              isFetchingEmails={isFetchingEmails}
+              handleGmailLogin={handleGmailLogin}
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />
@@ -1542,32 +1723,40 @@ export default function App() {
                       <div className="flex items-center gap-3.5 text-black/70">
                         <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center shrink-0">
                           <CalendarIcon className="w-4 h-4 text-black/60" />
-                        </div>
+                          
+      </div>
                         <span className="font-semibold tracking-wide">Tüm Gün</span>
-                      </div>
+                        
+      </div>
                     ) : (
                       <>
                         <div className="flex items-center gap-3.5 text-black/70">
                           <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center shrink-0">
                             <Clock className="w-4 h-4 text-black/60" />
-                          </div>
+                            
+      </div>
                           <span className="font-semibold tracking-wide">{selectedTask.startTime || '-'} - {selectedTask.endTime || '-'}</span>
-                        </div>
+                          
+      </div>
                         <div className="flex items-center gap-3.5 text-black/70">
                           <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center shrink-0">
                             <CalendarIcon className="w-4 h-4 text-black/60" />
-                          </div>
+                            
+      </div>
                           <span className="font-semibold tracking-wide">{selectedTask.duration || '-'} Süre</span>
-                        </div>
+                          
+      </div>
                       </>
                     )}
                     {selectedTask.locationName && (
                       <div className="flex items-center gap-3.5 text-black/70">
                         <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center shrink-0">
                           <MapPin className="w-4 h-4 text-black/60" />
-                        </div>
+                          
+      </div>
                         <span className="font-semibold tracking-wide">{selectedTask.locationName}</span>
-                      </div>
+                        
+      </div>
                     )}
                     
                     {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
@@ -1587,12 +1776,15 @@ export default function App() {
                             >
                               <div className={`w-4 h-4 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${st.completed ? 'bg-black border-black text-white' : 'border-black/30'}`}>
                                 {st.completed && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-2.5 h-2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-                              </div>
+                                
+      </div>
                               <span className={`text-[0.8125rem] font-semibold text-black/80 ${st.completed ? 'line-through opacity-50' : ''}`}>{st.title}</span>
                             </button>
                           ))}
-                        </div>
-                      </div>
+                          
+      </div>
+                        
+      </div>
                     )}
                     
                     {selectedTask.attachments && selectedTask.attachments.length > 0 && (
@@ -1609,21 +1801,28 @@ export default function App() {
                             >
                               <div className="w-8 h-8 shrink-0 rounded-lg bg-black/10 flex items-center justify-center text-black/60">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                              </div>
+                                
+      </div>
                               <div className="flex-1 overflow-hidden">
                                 <div className="text-[0.8125rem] font-semibold text-black/80 line-clamp-1">{file.name}</div>
                                 <div className="text-[0.6875rem] text-black/50 uppercase">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                              </div>
+                                
+      </div>
                               <div className="p-1.5 rounded-full hover:bg-black/10 transition-colors text-black/40 hover:text-black">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                              </div>
+                                
+      </div>
                             </a>
                           ))}
-                        </div>
-                      </div>
+                          
+      </div>
+                        
+      </div>
                     )}
-                  </div>
-                </div>
+                    
+      </div>
+                  
+      </div>
                 
                 <div className="flex flex-col gap-3">
                   <motion.button 
@@ -1666,8 +1865,10 @@ export default function App() {
                     >
                       Sil
                     </motion.button>
-                  </div>
-                </div>
+                    
+      </div>
+                  
+      </div>
               </motion.div>
             </motion.div>
           )}
@@ -1694,17 +1895,9 @@ export default function App() {
               </button>
             </motion.div>
           )}
-        </AnimatePresence>
-
-        {/* AI Chat FAB */}
-        <button
-          onClick={() => setIsAiChatOpen(true)}
-          className="fixed bottom-24 right-6 w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center shadow-xl z-40 hover:scale-105 active:scale-95 transition-transform"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
-        <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
         
+        </AnimatePresence>
+        <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
       </div>
     </div>
   );
