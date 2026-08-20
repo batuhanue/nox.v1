@@ -8,8 +8,9 @@ import AddTaskModal from "./components/AddTaskModal";
 import AiChat from "./components/AiChat";
 import Markdown from 'react-markdown';
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, getOAuthErrorMessage } from "./lib/googleOAuth";
 
 import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
@@ -1382,37 +1383,53 @@ export default function App() {
     }
   };
 
-  const handleGmailLogin = async () => {
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const handleCoreLogin = async () => {
+    setOauthError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        setGmailToken(credential.accessToken);
-        if (auth.currentUser) {
-          setDoc(doc(db, 'users', auth.currentUser.uid), { gmailToken: credential.accessToken }, { merge: true });
-        }
+      await handleFirebaseLogin();
+    } catch (error: any) {
+      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
+        const msg = getOAuthErrorMessage(error);
+        setOauthError(msg);
       }
-    } catch (error) {
-      console.error("Gmail Login Error:", error);
     }
   };
 
-  const handleLogin = async () => {
+  const handleCalendarConnect = async () => {
+    setOauthError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/calendar.events');
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        setAccessToken(credential.accessToken);
-        if (auth.currentUser) {
-          setDoc(doc(db, 'users', auth.currentUser.uid), { googleCalendarToken: credential.accessToken }, { merge: true });
+      const token = await handleConnectCalendar(user);
+      if (token) {
+        setAccessToken(token);
+        if (user) {
+          setDoc(doc(db, 'users', user.uid), { googleCalendarToken: token }, { merge: true });
         }
       }
-    } catch (error) {
-      console.error("Login Error:", error);
+    } catch (error: any) {
+      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
+        const msg = getOAuthErrorMessage(error);
+        setOauthError(msg);
+      }
+    }
+  };
+
+  const handleGmailConnect = async () => {
+    setOauthError(null);
+    try {
+      const token = await handleConnectGmail(user);
+      if (token) {
+        setGmailToken(token);
+        if (user) {
+          setDoc(doc(db, 'users', user.uid), { gmailToken: token }, { merge: true });
+        }
+      }
+    } catch (error: any) {
+      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
+        const msg = getOAuthErrorMessage(error);
+        setOauthError(msg);
+      }
     }
   };
 
@@ -1422,9 +1439,7 @@ export default function App() {
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-12 h-12 rounded-full border-2 border-black border-t-transparent animate-spin mb-4" />
           <p className="font-medium text-black/40 tracking-wider text-sm uppercase">Yükleniyor...</p>
-          
-      </div>
-        
+        </div>
       </div>
     );
   }
@@ -1444,8 +1459,7 @@ export default function App() {
           >
             <div className="w-20 h-20 bg-black rounded-3xl shadow-xl flex items-center justify-center mb-8 rotate-3">
               <CalendarIcon className="w-10 h-10 text-white" strokeWidth={1.5} />
-              
-      </div>
+            </div>
             
             <h1 className="text-4xl font-semibold tracking-tight text-black mb-3">Tasks</h1>
             <p className="text-black/50 text-center text-[0.9375rem] max-w-[280px] mb-12 font-medium leading-relaxed">
@@ -1454,7 +1468,7 @@ export default function App() {
             
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={handleLogin}
+              onClick={handleCoreLogin}
               className="bg-white text-black border border-black/10 shadow-sm rounded-full py-3.5 px-8 flex items-center gap-3 font-semibold text-[0.9375rem] hover:bg-black/5 transition-colors w-full justify-center"
               style={{ WebkitTapHighlightColor: "transparent" }}
             >
@@ -1466,10 +1480,13 @@ export default function App() {
               </svg>
               Google ile Giriş Yap
             </motion.button>
+            {oauthError && (
+              <p className="text-red-500 text-xs font-medium mt-3 text-center">
+                {oauthError}
+              </p>
+            )}
           </motion.div>
-          
-      </div>
-        
+        </div>
       </div>
     );
   }
@@ -1559,7 +1576,7 @@ export default function App() {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          handleLogin();
+                          handleCalendarConnect();
                           setIsSettingsOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
@@ -1665,7 +1682,7 @@ export default function App() {
               gmailToken={gmailToken}
               gmailEmails={gmailEmails}
               isFetchingEmails={isFetchingEmails}
-              handleGmailLogin={handleGmailLogin}
+              handleGmailLogin={handleGmailConnect}
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />
