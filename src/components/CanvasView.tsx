@@ -101,7 +101,7 @@ const CustomEdge = ({
                     key={k}
                     onClick={() => {
                       triggerHaptic('success');
-                      if (onChangeType) onChangeType(id, k);
+                      if (typeof onChangeType === "function") onChangeType(id, k);
                       setShowMenu(false);
                     }}
                     className={`text-left text-[11px] font-semibold px-2 py-1.5 rounded-[8px] transition-colors ${relationship === k ? 'bg-black/5 dark:bg-white/5 text-black dark:text-white' : 'text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5'}`}
@@ -1077,7 +1077,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
         <ReactFlow
           nodes={syncedNodes}
           edges={processedEdges}
-          onNodesChange={onNodesChange}
+          onNodesChange={onNodesChange as any}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onDrop={onDrop}
@@ -1086,7 +1086,7 @@ function CanvasFlow({ tasks, projectId, projectName, onTaskClick, onAddRequest, 
           fitView
           className="bg-[#f8f9fa]"
         >
-          <Background color="#000000" gap={16} size={1} opacity={0.05} />
+          <Background color="#000000" gap={16} size={1}  />
           <Controls className="!bg-white/80 !backdrop-blur-xl !border-black/10 !shadow-xl !rounded-2xl overflow-hidden [&>button]:!border-black/5" />
         </ReactFlow>
       </div>

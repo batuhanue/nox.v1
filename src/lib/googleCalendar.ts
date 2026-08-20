@@ -18,7 +18,11 @@ export async function syncGoogleCalendar(accessToken: string, userId: string, lo
   });
 
   if (!res.ok) {
-    console.error('Failed to fetch calendar events', await res.text());
+    const errorText = await res.text();
+    console.error('Failed to fetch calendar events', errorText);
+    if (res.status === 401) {
+        throw new Error('401_UNAUTHENTICATED');
+    }
     return;
   }
   const data = await res.json();
@@ -138,6 +142,7 @@ export async function createGoogleEvent(accessToken: string, task: Partial<Task>
         const data = await res.json();
         return data.id;
     }
+    if (res.status === 401) throw new Error('401_UNAUTHENTICATED');
     return null;
 }
 
@@ -165,7 +170,7 @@ export async function updateGoogleEvent(accessToken: string, googleEventId: stri
         }
     }
 
-    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`, {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`, {
         method: 'PUT',
         headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -173,11 +178,13 @@ export async function updateGoogleEvent(accessToken: string, googleEventId: stri
         },
         body: JSON.stringify(event)
     });
+    if (res.status === 401) throw new Error('401_UNAUTHENTICATED');
 }
 
 export async function deleteGoogleEvent(accessToken: string, googleEventId: string) {
-    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`, {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` }
     });
+    if (res.status === 401) throw new Error('401_UNAUTHENTICATED');
 }

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Clock, MapPin, LogOut, Settings, Moon, Sun, Bot, MessageCircle, CloudRain, CloudSnow, CloudLightning, Cloud, Loader2 } from "lucide-react";
 import { mockTasks, mockSchedules } from "./data";
 import { Task, DaySchedule } from "./types";
 import { motion, AnimatePresence, useDragControls, useReducedMotion } from "motion/react";
 import AddTaskModal from "./components/AddTaskModal";
+import AiChat from "./components/AiChat";
+import Markdown from 'react-markdown';
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -11,6 +13,7 @@ import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc
 import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
 import { syncGoogleCalendar, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "./lib/googleCalendar";
+import { WeatherBackground } from "./components/WeatherBackground";
 
 export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning') => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -288,7 +291,48 @@ const TaskCard: React.FC<{ task: Task, toggleTask: (id: string, current: boolean
   );
 }
 
-function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void }) {
+
+export function getWeatherConfig(code: number, isDay: number) {
+    if (code === 0 || code === 1) {
+        return {
+            gradient: 'from-blue-400/30 via-amber-200/20 dark:from-indigo-900/40 dark:via-purple-900/20',
+            icon: isDay ? Sun : Moon
+        };
+    }
+    if (code === 2 || code === 3) {
+        return {
+            gradient: 'from-slate-300/40 via-gray-200/20 dark:from-slate-800/50 dark:via-slate-700/20',
+            icon: Cloud
+        };
+    }
+    if (code >= 50 && code <= 67 || code >= 80 && code <= 82) {
+        return {
+            gradient: 'from-blue-600/30 via-slate-400/20 dark:from-blue-900/50 dark:via-slate-800/30',
+            icon: CloudRain
+        };
+    }
+    if (code >= 71 && code <= 77 || code >= 85 && code <= 86) {
+        return {
+            gradient: 'from-blue-100/40 via-slate-100/20 dark:from-slate-300/20 dark:via-blue-100/10',
+            icon: CloudSnow
+        };
+    }
+    if (code >= 95) {
+        return {
+            gradient: 'from-purple-800/30 via-slate-600/20 dark:from-purple-900/50 dark:via-slate-900/40',
+            icon: CloudLightning
+        };
+    }
+    return {
+        gradient: 'from-slate-200/30 dark:from-slate-800/40',
+        icon: Cloud
+    };
+}
+
+function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, aiRecommendation, isAiLoading, getAiRecommendation, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, aiRecommendation: string | null, isAiLoading: boolean, getAiRecommendation: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
+  
+  
+
   const today = new Date();
   const dayNum = today.getDate();
   const monthName = today.toLocaleDateString("tr-TR", { month: "long" }).toUpperCase();
@@ -346,34 +390,59 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
   const todayTasks = tasks.filter(t => t.date === todayStr && !t.inbox);
   const overdueTasks = tasks.filter(t => !t.completed && !t.inbox && t.date && t.date < todayStr);
 
-  const focusTasks = [...todayTasks].filter(t => !t.completed).sort((a, b) => (b.importance === 'high' ? 1 : 0) - (a.importance === 'high' ? 1 : 0)).slice(0, 3);
+  const focusTasks = [...todayTasks].filter(t => !t.completed).sort((a, b) => (b.importance === 'critical' ? 2 : b.importance === 'important' ? 1 : 0) - (a.importance === 'critical' ? 2 : a.importance === 'important' ? 1 : 0)).slice(0, 3);
   
   const programTasks = todayTasks.filter(t => !t.completed && !!t.startTime).sort((a, b) => a.startTime!.localeCompare(b.startTime!));
   
   const freeTasks = todayTasks.filter(t => !t.completed && !t.startTime);
 
   return (
-    <div className="flex flex-col px-6 md:px-12 py-10 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+    <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+      <div className="relative w-full flex flex-col items-center pt-10">
+        
+        <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col relative" style={{ zIndex: 10 }}>
       
-      <div className="flex items-center justify-between mb-16">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-black dark:text-white uppercase flex items-center gap-3">
-          {dayNum} {monthName}
-        </h1>
-        <button 
-          onClick={() => {
-            triggerHaptic('light');
-            onRequestPermission();
-          }}
-          className={`text-[0.625rem] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider transition-colors ${
-            notificationPermission === 'granted' 
-              ? 'bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40' 
-              : 'bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80'
-          }`}
-        >
-          {notificationPermission === 'granted' ? 'Bildirimler Açık' : 
-           notificationPermission === 'denied' ? 'Bildirimler Engellendi' : 
-           'Bildirimleri Aç'}
-        </button>
+      <div className="flex flex-col mb-10 md:mb-16">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className={`text-3xl md:text-4xl font-bold tracking-tight uppercase flex items-center gap-3 transition-colors ${weather ? (weather.isDay ? "text-[#1a1a1a] drop-shadow-md" : "text-white drop-shadow-md") : "text-black dark:text-white"}`}>
+            {dayNum} {monthName}
+            {!weather ? (
+              <button 
+                onClick={() => fetchWeather()}
+                disabled={weatherLoading}
+                className="ml-2 w-8 h-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black hover:bg-black/10 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                title="Hava Durumu"
+              >
+                {weatherLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+              </button>
+            ) : (
+              <div className={`ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md ${weather.isDay ? "bg-white/30" : "bg-black/30"}`}>
+                {(() => {
+                  const Icon = getWeatherConfig(weather.code, weather.isDay).icon;
+                  return <Icon className={`w-4 h-4 ${weather.isDay ? "text-black/80" : "text-white/90"}`} />;
+                })()}
+                <span className={`text-sm font-bold ${weather.isDay ? "text-black/80" : "text-white/90"}`}>{weather.temp}°</span>
+              </div>
+            )}
+          </h1>
+        </div>
+
+        <div className="flex flex-col">
+          <h2 className={`text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest mb-2 transition-colors ${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}`}>
+            Haftalık Yoğunluk
+          </h2>
+          <div className="flex gap-1 sm:gap-1.5 items-center">
+            {Array.from({ length: filledBlocks }).map((_, i) => (
+              <div key={`filled-${i}`} className={`h-2 w-4 sm:h-3.5 sm:w-6 rounded-[2px] transition-colors ${weather ? (weather.isDay ? "bg-[#1a1a1a]/60" : "bg-white/60") : "bg-black/60 dark:bg-white/60"}`} />
+            ))}
+            {Array.from({ length: emptyBlocks }).map((_, i) => (
+              <div key={`empty-${i}`} className={`h-2 w-4 sm:h-3.5 sm:w-6 rounded-[2px] transition-colors ${weather ? (weather.isDay ? "bg-[#1a1a1a]/10" : "bg-white/10") : "bg-black/10 dark:bg-white/10"}`} />
+            ))}
+            <span className={`text-xs sm:text-sm font-bold ml-1.5 sm:ml-2 transition-colors ${weather ? (weather.isDay ? "text-black/50" : "text-white/50") : "text-black/40 dark:text-white/40"}`}>
+              % {overallPercentage}
+            </span>
+          </div>
+        </div>
       </div>
 
       {today.getDay() === 0 && (
@@ -396,19 +465,33 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
       )}
 
       <div className="mb-14">
-        <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-4">Haftalık Yoğunluk</h2>
-        <div className="flex gap-1.5 items-center">
-          {Array.from({ length: filledBlocks }).map((_, i) => (
-            <div key={`filled-${i}`} className="h-3.5 w-6 bg-black dark:bg-white rounded-[2px]" />
-          ))}
-          {Array.from({ length: emptyBlocks }).map((_, i) => (
-            <div key={`empty-${i}`} className="h-3.5 w-6 bg-black/10 dark:bg-white/10 rounded-[2px]" />
-          ))}
-          <span className="text-sm font-bold text-black/40 dark:text-white/40 ml-2">% {overallPercentage}</span>
+        <div className="flex items-center gap-2 mb-4">
+          <Bot className="w-4 h-4 text-black/40 dark:text-white/40" />
+          <h2 className="text-[0.6875rem] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest">Yapay Zeka Önerileri</h2>
         </div>
+        {aiRecommendation ? (
+          <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 rounded-2xl p-5 text-sm text-black/80 dark:text-white/80 markdown-body prose-sm dark:prose-invert">
+            <Markdown>{aiRecommendation}</Markdown>
+          </div>
+        ) : (
+          <button
+            onClick={getAiRecommendation}
+            disabled={isAiLoading}
+            className="flex items-center justify-center gap-2 w-full py-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black/60 dark:text-white/60 rounded-2xl transition-colors font-medium text-sm disabled:opacity-50"
+          >
+            {isAiLoading ? (
+              <span className="animate-pulse">Analiz ediliyor...</span>
+            ) : (
+              <>Programımı Analiz Et</>
+            )}
+          </button>
+        )}
       </div>
 
-      {overdueTasks.length > 0 && (
+              </div>
+      </div>
+      <div className="w-full max-w-2xl px-6 md:px-12 flex flex-col mt-4">
+        {overdueTasks.length > 0 && (
         <div className="mb-14">
           <h2 className="text-[0.6875rem] font-bold text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -488,6 +571,7 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
           <span className="text-black/60 dark:text-white/60 font-medium text-[15px]">{inboxCount} Inbox öğesi</span>
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -832,8 +916,51 @@ function WeeklyReviewView({ tasks, updateTask, deleteTask, setView }: { tasks: T
 
 export default function App() {
   const [view, setView] = useState<"inbox" | "today" | "calendar" | "kanvas" | "weekly-review">("today");
+  const [weather, setWeather] = useState<{ temp: number, code: number, isDay: number } | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+
+  const fetchWeather = async (savedLat?: number, savedLon?: number) => {
+      if (savedLat !== undefined && savedLon !== undefined) {
+         setWeatherLoading(true);
+         try {
+           const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${savedLat}&longitude=${savedLon}&current=temperature_2m,weather_code,is_day`);
+           const data = await res.json();
+           setWeather({ temp: Math.round(data.current.temperature_2m), code: data.current.weather_code, isDay: data.current.is_day });
+         } catch (e) {
+           console.error(e);
+         } finally {
+           setWeatherLoading(false);
+         }
+         return;
+      }
+
+      if (!navigator.geolocation) {
+        alert("Tarayıcınız konum özelliğini desteklemiyor.");
+        return;
+      }
+      setWeatherLoading(true);
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+         const lat = pos.coords.latitude;
+         const lon = pos.coords.longitude;
+         try {
+           const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day`);
+           const data = await res.json();
+           setWeather({ temp: Math.round(data.current.temperature_2m), code: data.current.weather_code, isDay: data.current.is_day });
+           if (user) {
+             setDoc(doc(db, 'users', user.uid), { weatherLocation: { lat, lon } }, { merge: true });
+           }
+         } catch (e) {
+           console.error(e);
+         } finally {
+           setWeatherLoading(false);
+         }
+      }, (err) => {
+         setWeatherLoading(false);
+         console.error("Geolocation error:", err.message); alert("Konum alınamadı: " + err.message + "\nLütfen tarayıcı/sistem ayarlarından konum izni verdiğinizden emin olun.");
+      });
+  };
   const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(() => typeof window !== 'undefined' ? localStorage.getItem('google_calendar_token') : null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -842,6 +969,21 @@ export default function App() {
   const sheetDragControls = useDragControls();
   const prefersReducedMotion = useReducedMotion();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const handleGoogleError = (e: any) => {
+    console.error(e);
+    if (e?.message === '401_UNAUTHENTICATED') {
+      setAccessToken(null);
+      if (user) {
+        setDoc(doc(db, 'users', user.uid), { googleCalendarToken: null }, { merge: true });
+      }
+      // Optionally notify user
+    }
+  };
+
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   
   const [undoTask, setUndoTask] = useState<Task | null>(null);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -871,6 +1013,24 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // Fetch User Preferences Effect
+  useEffect(() => {
+    if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribePrefs = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.googleCalendarToken && data.googleCalendarToken !== accessToken) {
+           setAccessToken(data.googleCalendarToken);
+        }
+        if (data.weatherLocation && data.weatherLocation.lat && data.weatherLocation.lon && !weather && !weatherLoading) {
+           fetchWeather(data.weatherLocation.lat, data.weatherLocation.lon);
+        }
+      }
+    });
+    return unsubscribePrefs;
+  }, [user, weather, weatherLoading, accessToken]);
+
   // Fetch Tasks Effect
   useEffect(() => {
     if (!user) {
@@ -899,7 +1059,7 @@ export default function App() {
   useEffect(() => {
     if (user && accessToken && tasks.length > 0 && !hasSyncedRef.current) {
       hasSyncedRef.current = true;
-      syncGoogleCalendar(accessToken, user.uid, tasks).catch(console.error);
+      syncGoogleCalendar(accessToken, user.uid, tasks).catch(handleGoogleError);
     }
   }, [user, accessToken, tasks]); // Run when tasks populate, but only sync once per session
 
@@ -909,7 +1069,7 @@ export default function App() {
       const taskToToggle = tasks.find(t => t.id === id);
       if (taskToToggle && taskToToggle.googleEventId && accessToken) {
           const updatedTask = { ...taskToToggle, completed: !current };
-          await updateGoogleEvent(accessToken, updatedTask.googleEventId, updatedTask).catch(console.error);
+          await updateGoogleEvent(accessToken, updatedTask.googleEventId, updatedTask).catch(handleGoogleError);
       }
 
       const taskRef = doc(db, `users/${user.uid}/tasks`, id);
@@ -929,7 +1089,7 @@ export default function App() {
     if (!taskToDelete) return;
     try {
       if (taskToDelete.googleEventId && accessToken) {
-          await deleteGoogleEvent(accessToken, taskToDelete.googleEventId).catch(console.error);
+          await deleteGoogleEvent(accessToken, taskToDelete.googleEventId).catch(handleGoogleError);
       }
 
       const taskRef = doc(db, `users/${user.uid}/tasks`, id);
@@ -980,7 +1140,7 @@ export default function App() {
       
       const updatedTask = tasks.find(t => t.id === id);
       if (updatedTask && updatedTask.googleEventId && accessToken) {
-          await updateGoogleEvent(accessToken, updatedTask.googleEventId, { ...updatedTask, ...updates }).catch(console.error);
+          await updateGoogleEvent(accessToken, updatedTask.googleEventId, { ...updatedTask, ...updates }).catch(handleGoogleError);
       }
     } catch (e) {
       console.error("Error updating task:", e);
@@ -1047,7 +1207,7 @@ export default function App() {
 
     try {
       if (accessToken) {
-          const gId = await createGoogleEvent(accessToken, newTask).catch(console.error);
+          const gId = await createGoogleEvent(accessToken, newTask).catch(handleGoogleError);
           if (gId) newTask.googleEventId = gId;
       }
       const taskRef = doc(db, `users/${user.uid}/tasks`, taskId);
@@ -1059,6 +1219,34 @@ export default function App() {
     }
   };
 
+  const getAiRecommendation = async () => {
+    if (isAiLoading || aiRecommendation) return;
+    setIsAiLoading(true);
+    try {
+      const res = await fetch('/api/ai/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks, todayStr: getLocalISODate(new Date()) })
+      });
+      const data = await res.json();
+      if (data.recommendation) {
+        setAiRecommendation(data.recommendation);
+      } else if (data.error) {
+        let errMsg = data.error;
+        try {
+          const parsed = JSON.parse(data.error);
+          if (parsed.error && parsed.error.message) errMsg = parsed.error.message;
+        } catch(e) {}
+        setAiRecommendation(`**Hata:** ${errMsg}. \n\nLütfen AI Studio **Settings (Ayarlar)** panelinden geçerli bir Gemini API Anahtarı girdiğinizden emin olun.`);
+      }
+    } catch (e: any) {
+      console.error("AI Error:", e);
+      setAiRecommendation(`**Bir hata oluştu:** ${e.message}`);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -1067,7 +1255,9 @@ export default function App() {
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         setAccessToken(credential.accessToken);
-        localStorage.setItem('google_calendar_token', credential.accessToken);
+        if (auth.currentUser) {
+          setDoc(doc(db, 'users', auth.currentUser.uid), { googleCalendarToken: credential.accessToken }, { merge: true });
+        }
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -1128,10 +1318,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f4f4] dark:bg-[#121212] text-black dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300">
-      <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col relative">
+    <div className={`min-h-screen ${(weather && view === "today") ? "bg-transparent" : "bg-[#f4f4f4] dark:bg-[#121212]"} text-black dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300`}>
+      {(weather && view === "today") && <div className="fixed inset-0 w-screen h-screen pointer-events-none" style={{ zIndex: 0 }}><WeatherBackground weatherCode={weather.code} isDay={weather.isDay} /></div>}
+      <div className="w-full max-w-5xl mx-auto min-h-screen flex flex-col relative" style={{ zIndex: 10 }}>
         {/* Header */}
-        <header className="flex items-center justify-between px-6 md:px-10 pt-12 md:pt-10 pb-4 sticky top-0 z-20 bg-[#f4f4f4]/80 dark:bg-[#121212]/80 backdrop-blur-xl border-b border-black/[0.03] dark:border-white/[0.03]">
+        <header className={`flex items-center justify-between px-6 md:px-10 pt-12 md:pt-10 pb-4 sticky top-0 z-20 backdrop-blur-xl border-b border-black/[0.03] dark:border-white/[0.03] transition-colors duration-300 ${(weather && view === "today") ? (weather.isDay ? "bg-white/30" : "bg-black/30") : "bg-[#f4f4f4]/80 dark:bg-[#121212]/80"}`}>
           <div className="flex items-center bg-black/[0.06] dark:bg-white/[0.06] p-[3px] rounded-full relative">
             {(["inbox", "today", "calendar", "kanvas"] as const).map((tab) => (
               <button
@@ -1205,6 +1396,29 @@ export default function App() {
                       </button>
                     )}
                     <div className="h-[1px] bg-black/5 dark:bg-white/5 my-1 mx-2" />
+                    <button 
+                      onClick={() => {
+                        triggerHaptic('light');
+                        onRequestPermission();
+                      }}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-black/60 dark:text-white/60"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        <span className="text-[0.8125rem] font-semibold text-black/80 dark:text-white/80">
+                          Bildirimler
+                        </span>
+                      </div>
+                      <span className={`text-[0.625rem] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        notificationPermission === 'granted' 
+                          ? 'bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60' 
+                          : 'bg-black dark:bg-white text-white dark:text-black'
+                      }`}>
+                        {notificationPermission === 'granted' ? 'Açık' : notificationPermission === 'denied' ? 'Engellendi' : 'İzin Ver'}
+                      </span>
+                    </button>
+
+                    <div className="h-[1px] bg-black/5 dark:bg-white/5 my-1 mx-2" />
                     <button
                       onClick={() => {
                         triggerHaptic('light');
@@ -1254,6 +1468,12 @@ export default function App() {
               notificationPermission={notificationPermission}
               onRequestPermission={onRequestPermission}
               setView={setView}
+              weather={weather}
+              weatherLoading={weatherLoading}
+              fetchWeather={fetchWeather}
+              aiRecommendation={aiRecommendation}
+              isAiLoading={isAiLoading}
+              getAiRecommendation={getAiRecommendation}
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />
@@ -1475,6 +1695,16 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* AI Chat FAB */}
+        <button
+          onClick={() => setIsAiChatOpen(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center shadow-xl z-40 hover:scale-105 active:scale-95 transition-transform"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+        <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
+        
       </div>
     </div>
   );

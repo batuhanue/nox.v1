@@ -5,9 +5,14 @@ import path from 'path';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
 
 // Initialize VAPID Keys
 const VAPID_KEYS_FILE = path.join(process.cwd(), 'vapidKeys.json');
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 let vapidKeys: { publicKey: string, privateKey: string };
 
 if (fs.existsSync(VAPID_KEYS_FILE)) {
@@ -178,6 +183,70 @@ app.post('/api/push/test', (req, res) => {
       console.error('Test push failed', err);
       res.status(500).json({ error: err.message });
     });
+});
+
+app.post('/api/ai/recommend', async (req, res) => {
+  try {
+    const { tasks, todayStr } = req.body;
+    const prompt = `
+      Sen profesyonel bir asistan ve zaman yönetimi uzmanısın. Kullanıcının günlük, haftalık ve aylık görev planını, alt görevleri, süreleri, yoğunlukları, varsa projeleri analiz et. 
+      Özellikle görevlerin yoğunluğu ile kalan süreyi karşılaştırıp zamanında yetişip yetişmeyeceği konusunda pratik öneriler sun.
+      Görevler:
+      ${JSON.stringify(tasks, null, 2)}
+      
+      Bugünün tarihi: ${todayStr}
+      
+      Lütfen markdown formatında sadece önerilerini içeren kısa, net ve teşvik edici bir değerlendirme yaz.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+    });
+    
+    res.json({ recommendation: response.text });
+  } catch (error: any) {
+    console.error("AI Recommendation error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message, history } = req.body;
+    
+    const contents = [];
+    if (history && Array.isArray(history)) {
+      for (const msg of history) {
+        contents.push({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] });
+      }
+    }
+    contents.push({ role: 'user', parts: [{ text: message }] });
+
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3.5-flash",
+      contents: contents,
+      config: {
+        systemInstruction: "Sen kullanıcının üretkenliğini artırmaya yardımcı olan, nox adlı zaman yönetimi ve verimlilik uygulamasında çalışan bir AI asistanısın. Kısa, samimi ve hedefe yönelik cevaplar ver."
+      }
+    });
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+      }
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error: any) {
+    console.error("AI Chat error:", error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
 });
 
 async function startServer() {

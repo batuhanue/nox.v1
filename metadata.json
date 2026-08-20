@@ -1,6 +1,10 @@
 {
   "name": "NOX",
   "description": "Dünyanın en basit ve akıcı minimalist to-do uygulaması. Kolay ve hızlı arayüz.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
