@@ -10,11 +10,11 @@ import Markdown from 'react-markdown';
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, getOAuthErrorMessage } from "./lib/googleOAuth";
 
 import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
 import { syncGoogleCalendar, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "./lib/googleCalendar";
+import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, normalizeOAuthError } from "./lib/googleOAuth";
 import { WeatherBackground } from "./components/WeatherBackground";
 import { MobileDock } from "./components/MobileDock";
 
@@ -350,7 +350,7 @@ export function getWeatherConfig(code: number, isDay: number) {
 }
 
 
-function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, gmailToken, gmailEmails, isFetchingEmails, handleGmailLogin, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, gmailToken: string | null, gmailEmails: any[], isFetchingEmails: boolean, handleGmailLogin: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
+function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, notificationPermission, onRequestPermission, setView, gmailToken, gmailEmails, isFetchingEmails, handleConnectGmail, weather, weatherLoading, fetchWeather }: { tasks: Task[], toggleTask: (id: string, current: boolean) => void, deleteTask: (id: string) => void, updateTask: (id: string, updates: Partial<Task>) => void, onTaskClick: (task: Task) => void, notificationPermission: NotificationPermission, onRequestPermission: () => void, setView: (view: any) => void, gmailToken: string | null, gmailEmails: any[], isFetchingEmails: boolean, handleConnectGmail: () => void, weather: { temp: number, code: number, isDay: number } | null, weatherLoading: boolean, fetchWeather: () => void }) {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const today = new Date();
   const dayNum = today.getDate();
@@ -466,7 +466,7 @@ function TodayView({ tasks, toggleTask, deleteTask, updateTask, onTaskClick, not
               </div>
               {!gmailToken && (
                 <button
-                  onClick={handleGmailLogin}
+                  onClick={handleConnectGmail}
                   className="text-[0.625rem] font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors text-black/80 dark:text-white/80"
                 >
                   Bağlan
@@ -1383,53 +1383,57 @@ export default function App() {
     }
   };
 
-  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const authErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleCoreLogin = async () => {
-    setOauthError(null);
+  const showOAuthError = (err: unknown) => {
+    const msg = normalizeOAuthError(err);
+    setAuthError(msg);
+    if (authErrorTimeoutRef.current) clearTimeout(authErrorTimeoutRef.current);
+    authErrorTimeoutRef.current = setTimeout(() => {
+      setAuthError(null);
+    }, 6000);
+  };
+
+  const handleFirebaseLoginAction = async () => {
     try {
+      setAuthError(null);
       await handleFirebaseLogin();
-    } catch (error: any) {
-      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
-        const msg = getOAuthErrorMessage(error);
-        setOauthError(msg);
-      }
+      triggerHaptic('success');
+    } catch (error) {
+      showOAuthError(error);
     }
   };
 
-  const handleCalendarConnect = async () => {
-    setOauthError(null);
+  const handleConnectCalendarAction = async () => {
+    if (!user) {
+      setAuthError('Takvim bağlantısı için önce NOX oturumu açmalısınız.');
+      return;
+    }
     try {
+      setAuthError(null);
       const token = await handleConnectCalendar(user);
-      if (token) {
-        setAccessToken(token);
-        if (user) {
-          setDoc(doc(db, 'users', user.uid), { googleCalendarToken: token }, { merge: true });
-        }
-      }
-    } catch (error: any) {
-      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
-        const msg = getOAuthErrorMessage(error);
-        setOauthError(msg);
-      }
+      setAccessToken(token);
+      await setDoc(doc(db, 'users', user.uid), { googleCalendarToken: token }, { merge: true });
+      triggerHaptic('success');
+    } catch (error) {
+      showOAuthError(error);
     }
   };
 
-  const handleGmailConnect = async () => {
-    setOauthError(null);
+  const handleConnectGmailAction = async () => {
+    if (!user) {
+      setAuthError('Gmail bağlantısı için önce NOX oturumu açmalısınız.');
+      return;
+    }
     try {
+      setAuthError(null);
       const token = await handleConnectGmail(user);
-      if (token) {
-        setGmailToken(token);
-        if (user) {
-          setDoc(doc(db, 'users', user.uid), { gmailToken: token }, { merge: true });
-        }
-      }
-    } catch (error: any) {
-      if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
-        const msg = getOAuthErrorMessage(error);
-        setOauthError(msg);
-      }
+      setGmailToken(token);
+      await setDoc(doc(db, 'users', user.uid), { gmailToken: token }, { merge: true });
+      triggerHaptic('success');
+    } catch (error) {
+      showOAuthError(error);
     }
   };
 
@@ -1439,7 +1443,9 @@ export default function App() {
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-12 h-12 rounded-full border-2 border-black border-t-transparent animate-spin mb-4" />
           <p className="font-medium text-black/40 tracking-wider text-sm uppercase">Yükleniyor...</p>
-        </div>
+          
+      </div>
+        
       </div>
     );
   }
@@ -1459,7 +1465,8 @@ export default function App() {
           >
             <div className="w-20 h-20 bg-black rounded-3xl shadow-xl flex items-center justify-center mb-8 rotate-3">
               <CalendarIcon className="w-10 h-10 text-white" strokeWidth={1.5} />
-            </div>
+              
+      </div>
             
             <h1 className="text-4xl font-semibold tracking-tight text-black mb-3">Tasks</h1>
             <p className="text-black/50 text-center text-[0.9375rem] max-w-[280px] mb-12 font-medium leading-relaxed">
@@ -1468,7 +1475,7 @@ export default function App() {
             
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={handleCoreLogin}
+              onClick={handleFirebaseLoginAction}
               className="bg-white text-black border border-black/10 shadow-sm rounded-full py-3.5 px-8 flex items-center gap-3 font-semibold text-[0.9375rem] hover:bg-black/5 transition-colors w-full justify-center"
               style={{ WebkitTapHighlightColor: "transparent" }}
             >
@@ -1480,13 +1487,19 @@ export default function App() {
               </svg>
               Google ile Giriş Yap
             </motion.button>
-            {oauthError && (
-              <p className="text-red-500 text-xs font-medium mt-3 text-center">
-                {oauthError}
-              </p>
+            {authError && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 px-4 py-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-2xl text-xs font-medium text-center max-w-[320px]"
+              >
+                {authError}
+              </motion.div>
             )}
           </motion.div>
-        </div>
+          
+      </div>
+        
       </div>
     );
   }
@@ -1576,7 +1589,7 @@ export default function App() {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          handleCalendarConnect();
+                          handleConnectCalendarAction();
                           setIsSettingsOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
@@ -1682,7 +1695,7 @@ export default function App() {
               gmailToken={gmailToken}
               gmailEmails={gmailEmails}
               isFetchingEmails={isFetchingEmails}
-              handleGmailLogin={handleGmailConnect}
+              handleConnectGmail={handleConnectGmailAction}
             />
           ) : view === "calendar" ? (
             <CalendarView tasks={tasks} onTaskClick={setSelectedTask} />
@@ -1925,7 +1938,26 @@ export default function App() {
               </button>
             </motion.div>
           )}
-        
+
+          {authError && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white rounded-[16px] px-4 py-3 flex items-center justify-between gap-4 shadow-2xl z-50 w-[90%] max-w-md"
+            >
+              <span className="text-[0.8125rem] font-medium text-white line-clamp-2">
+                {authError}
+              </span>
+              <button 
+                onClick={() => setAuthError(null)}
+                className="text-white/80 hover:text-white text-xs font-bold uppercase tracking-wider p-1 shrink-0"
+              >
+                Kapat
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
         <AiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} />
       </div>

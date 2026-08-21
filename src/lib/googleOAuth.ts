@@ -1,64 +1,91 @@
-import { GoogleAuthProvider, signInWithPopup, reauthenticateWithPopup, UserCredential, User } from 'firebase/auth';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  reauthenticateWithPopup, 
+  User, 
+  UserCredential 
+} from 'firebase/auth';
 import { auth } from '../firebase';
 
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
-export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 /**
- * Normalizes Firebase and Google OAuth errors into user-friendly Turkish messages
- * while preserving console diagnostic logs.
+ * Extracts error code from Firebase or OAuth error objects
  */
-export function getOAuthErrorMessage(error: unknown): string {
-  if (!error || typeof error !== 'object') {
-    return 'Bilinmeyen bir hata oluştu. Lütfen tekrar deneyin.';
+export function getOAuthErrorCode(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    return String((error as any).code);
   }
+  return '';
+}
 
-  const err = error as { code?: string; message?: string; status?: number };
-  const errorCode = err.code || '';
-
-  switch (errorCode) {
+/**
+ * Normalizes Firebase and Google OAuth errors into localized Turkish messages for users
+ */
+export function normalizeOAuthError(error: unknown): string {
+  const code = getOAuthErrorCode(error);
+  
+  switch (code) {
     case 'auth/popup-closed-by-user':
-      return 'Giriş penceresi kullanıcı tarafından kapatıldı.';
+      return 'Oturum açma penceresi işlem tamamlanmadan kapatıldı.';
     case 'auth/cancelled-popup-request':
-      return 'Giriş isteği iptal edildi.';
+      return 'Önceki oturum açma isteği iptal edildi.';
     case 'auth/popup-blocked':
-      return 'Açılır pencere tarayıcı tarafından engellendi. Lütfen açılır pencerelere izin verin.';
+      return 'Açılır pencere tarayıcı tarafından engellendi. Lütfen tarayıcı ayarlarından açılır pencerelere izin verin.';
     case 'auth/network-request-failed':
-      return 'Ağ bağlantısı hatası oluştu. Lütfen internet bağlantınızı kontrol edin.';
+      return 'Ağ bağlantısı hatası. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
     case 'auth/unauthorized-domain':
-      return 'Bu alan adı yetkilendirilmemiş. Lütfen Firebase Console ayarlarını kontrol edin.';
+      return 'Bu alan adı Firebase Authentication için yetkilendirilmemiş.';
     case 'auth/account-exists-with-different-credential':
-      return 'Bu e-posta adresiyle ilişkili farklı bir hesap mevcut.';
+      return 'Bu e-posta adresi farklı bir giriş yöntemiyle ilişkilendirilmiş.';
     case 'auth/requires-recent-login':
-      return 'Güvenlik nedeniyle bu işlem için yakın zamanda yeniden giriş yapmış olmanız gerekir.';
+      return 'Güvenlik nedeniyle bu işlem için yakın zamanda giriş yapmış olmanız gerekir. Lütfen tekrar giriş yapın.';
+    case 'auth/user-mismatch':
+      return 'Seçilen Google hesabı, giriş yapmış olan kullanıcı ile eşleşmiyor. Lütfen aynı hesabı seçin.';
+    case 'auth/credential-already-in-use':
+      return 'Bu Google hesabı zaten başka bir kullanıcı tarafından kullanılıyor.';
     case 'auth/invalid-credential':
-      return 'Geçersiz kimlik bilgisi. Lütfen tekrar deneyin.';
-    case 'auth/user-disabled':
-      return 'Bu kullanıcı hesabı devre dışı bırakılmış.';
+      return 'Kimlik bilgisi geçersiz veya süresi dolmuş.';
+    case 'auth/operation-not-allowed':
+      return 'Bu oturum açma sağlayıcısı Firebase yapılandırmasında etkinleştirilmemiş.';
     default:
-      if (err.message && err.message.includes('401')) {
-        return 'Oturum süresi doldu veya yetkilendirme geçersiz.';
+      if (error instanceof Error && error.message) {
+        return error.message;
       }
-      return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+      return 'Yetkilendirme sırasında bir hata oluştu.';
   }
 }
 
-export const normalizeOAuthError = getOAuthErrorMessage;
+/**
+ * Detailed console logging for developer debugging
+ */
+export function logOAuthError(context: string, error: unknown) {
+  const code = getOAuthErrorCode(error);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[OAuth Error] Context: ${context}`, {
+    code,
+    message,
+    errorObject: error,
+  });
+}
 
 /**
- * Factory for GoogleAuthProvider instances.
+ * Factory for creating GoogleAuthProvider with specific scopes and parameters
  */
-export function createGoogleProvider(scopes: string[] = [], customParameters: Record<string, string> = {}): GoogleAuthProvider {
+export function createGoogleProvider(scopes: string[] = [], customParams?: Record<string, string>): GoogleAuthProvider {
   const provider = new GoogleAuthProvider();
-  scopes.forEach(scope => provider.addScope(scope));
-  if (Object.keys(customParameters).length > 0) {
-    provider.setCustomParameters(customParameters);
+  for (const scope of scopes) {
+    provider.addScope(scope);
+  }
+  if (customParams) {
+    provider.setCustomParameters(customParams);
   }
   return provider;
 }
 
 /**
- * Extracts OAuth Access Token from Firebase UserCredential
+ * Extracts Google OAuth access token from a UserCredential
  */
 export function getGoogleAccessToken(result: UserCredential): string | null {
   const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -66,82 +93,77 @@ export function getGoogleAccessToken(result: UserCredential): string | null {
 }
 
 /**
- * 1. Core NOX Firebase Authentication
- * Pure Firebase login WITHOUT requesting Calendar or Gmail scopes.
+ * 1. Core NOX Firebase Login
+ * Requests minimum identity scopes ONLY (no Calendar, no Gmail).
  */
 export async function handleFirebaseLogin(): Promise<UserCredential> {
-  const provider = createGoogleProvider([], { prompt: 'select_account' });
+  const provider = createGoogleProvider([], {
+    prompt: 'select_account',
+  });
+  
   try {
     const result = await signInWithPopup(auth, provider);
     return result;
-  } catch (error: any) {
-    console.error('Firebase Core Login Error:', {
-      code: error?.code,
-      message: error?.message,
-      error
-    });
+  } catch (error) {
+    logOAuthError('handleFirebaseLogin', error);
     throw error;
   }
 }
 
 /**
  * 2. Dedicated Google Calendar Authorization
- * Requests ONLY calendar.events scope for an already-authenticated NOX user.
+ * Requests only Calendar events scope for an already authenticated Firebase user.
  */
-export async function handleConnectCalendar(currentUser?: User | null): Promise<string | null> {
+export async function handleConnectCalendar(currentUser?: User | null): Promise<string> {
   const user = currentUser || auth.currentUser;
   if (!user) {
-    const errorMsg = 'Takvim bağlantısı için önce NOX oturumu açılmış olmalıdır.';
-    console.error('Calendar Authorization Error: No authenticated user.');
-    throw new Error(errorMsg);
+    const err = new Error('Takvim bağlantısı için önce NOX oturumu açmalısınız.');
+    logOAuthError('handleConnectCalendar', err);
+    throw err;
   }
 
-  const provider = createGoogleProvider([CALENDAR_SCOPE], { prompt: 'consent' });
+  const calendarProvider = createGoogleProvider([CALENDAR_SCOPE], {
+    prompt: 'consent',
+  });
 
   try {
-    const result = await signInWithPopup(auth, provider);
-    const accessToken = getGoogleAccessToken(result);
-    if (!accessToken) {
-      console.warn('Calendar Authorization completed but no accessToken was returned.');
+    const result = await reauthenticateWithPopup(user, calendarProvider);
+    const token = getGoogleAccessToken(result);
+    if (!token) {
+      throw new Error('Google Takvim erişim anahtarı alınamadı.');
     }
-    return accessToken;
-  } catch (error: any) {
-    console.error('Calendar Authorization Error:', {
-      code: error?.code,
-      message: error?.message,
-      error
-    });
+    return token;
+  } catch (error) {
+    logOAuthError('handleConnectCalendar', error);
     throw error;
   }
 }
 
 /**
  * 3. Dedicated Gmail Authorization
- * Requests ONLY gmail.readonly scope for an already-authenticated NOX user.
+ * Requests only Gmail readonly scope for an already authenticated Firebase user.
  */
-export async function handleConnectGmail(currentUser?: User | null): Promise<string | null> {
+export async function handleConnectGmail(currentUser?: User | null): Promise<string> {
   const user = currentUser || auth.currentUser;
   if (!user) {
-    const errorMsg = 'Gmail bağlantısı için önce NOX oturumu açılmış olmalıdır.';
-    console.error('Gmail Authorization Error: No authenticated user.');
-    throw new Error(errorMsg);
+    const err = new Error('Gmail bağlantısı için önce NOX oturumu açmalısınız.');
+    logOAuthError('handleConnectGmail', err);
+    throw err;
   }
 
-  const provider = createGoogleProvider([GMAIL_SCOPE], { prompt: 'consent' });
+  const gmailProvider = createGoogleProvider([GMAIL_READONLY_SCOPE], {
+    prompt: 'consent',
+  });
 
   try {
-    const result = await signInWithPopup(auth, provider);
-    const accessToken = getGoogleAccessToken(result);
-    if (!accessToken) {
-      console.warn('Gmail Authorization completed but no accessToken was returned.');
+    const result = await reauthenticateWithPopup(user, gmailProvider);
+    const token = getGoogleAccessToken(result);
+    if (!token) {
+      throw new Error('Gmail erişim anahtarı alınamadı.');
     }
-    return accessToken;
-  } catch (error: any) {
-    console.error('Gmail Authorization Error:', {
-      code: error?.code,
-      message: error?.message,
-      error
-    });
+    return token;
+  } catch (error) {
+    logOAuthError('handleConnectGmail', error);
     throw error;
   }
 }

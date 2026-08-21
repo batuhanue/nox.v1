@@ -1,5 +1,5 @@
-import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, getOAuthErrorMessage, createGoogleProvider } from './googleOAuth';
+import { handleFirebaseLogin, createGoogleProvider } from './googleOAuth';
 
 export const googleProvider = createGoogleProvider();
-export { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, getOAuthErrorMessage };
+export const signInWithGoogle = handleFirebaseLogin;
 
