@@ -14,7 +14,7 @@ import { collection, doc, onSnapshot, query, where, setDoc, deleteDoc, updateDoc
 import CanvasView from "./components/CanvasView";
 import InboxView from "./components/InboxView";
 import { syncGoogleCalendar, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "./lib/googleCalendar";
-import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, normalizeOAuthError } from "./lib/googleOAuth";
+import { handleFirebaseLogin, handleConnectCalendar, handleConnectGmail, normalizeOAuthError, encryptToken, decryptToken } from "./lib/googleOAuth";
 import { WeatherBackground } from "./components/WeatherBackground";
 import { MobileDock } from "./components/MobileDock";
 
@@ -1093,14 +1093,26 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribePrefs = onSnapshot(userDocRef, (docSnap) => {
+    const unsubscribePrefs = onSnapshot(userDocRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.gmailToken && data.gmailToken !== gmailToken) {
-           setGmailToken(data.gmailToken);
+           try {
+             const decrypted = await decryptToken(data.gmailToken, user);
+             setGmailToken(decrypted);
+           } catch (e) {
+             console.error("Failed to decrypt gmail token", e);
+             setGmailToken(null);
+           }
         }
         if (data.googleCalendarToken && data.googleCalendarToken !== accessToken) {
-           setAccessToken(data.googleCalendarToken);
+           try {
+             const decrypted = await decryptToken(data.googleCalendarToken, user);
+             setAccessToken(decrypted);
+           } catch (e) {
+             console.error("Failed to decrypt calendar token", e);
+             setAccessToken(null);
+           }
         }
         if (data.weatherLocation && data.weatherLocation.lat && data.weatherLocation.lon && !weather && !weatherLoading) {
            fetchWeather(data.weatherLocation.lat, data.weatherLocation.lon);
@@ -1414,7 +1426,9 @@ export default function App() {
       setAuthError(null);
       const token = await handleConnectCalendar(user);
       setAccessToken(token);
-      await setDoc(doc(db, 'users', user.uid), { googleCalendarToken: token }, { merge: true });
+      
+      const encrypted = await encryptToken(token, user);
+      await setDoc(doc(db, 'users', user.uid), { googleCalendarToken: encrypted }, { merge: true });
       triggerHaptic('success');
     } catch (error) {
       showOAuthError(error);
@@ -1430,7 +1444,9 @@ export default function App() {
       setAuthError(null);
       const token = await handleConnectGmail(user);
       setGmailToken(token);
-      await setDoc(doc(db, 'users', user.uid), { gmailToken: token }, { merge: true });
+      
+      const encrypted = await encryptToken(token, user);
+      await setDoc(doc(db, 'users', user.uid), { gmailToken: encrypted }, { merge: true });
       triggerHaptic('success');
     } catch (error) {
       showOAuthError(error);

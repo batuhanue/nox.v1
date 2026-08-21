@@ -6,6 +6,56 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
+import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import crypto from 'crypto';
+
+// Initialize Firebase Admin for backend security
+const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'studio-4329353910-71110';
+admin.initializeApp({
+  projectId: FIREBASE_PROJECT_ID,
+});
+
+// Encryption logic
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+const IV_LENGTH = 16; // For AES, this is always 16
+
+function encrypt(text: string) {
+  let iv = crypto.randomBytes(IV_LENGTH);
+  const key = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest('base64').substring(0, 32);
+  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text: string) {
+  let textParts = text.split(':');
+  let iv = Buffer.from(textParts.shift()!, 'hex');
+  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+  const key = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest('base64').substring(0, 32);
+  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
+
+// Authentication middleware
+async function authenticateToken(req: any, res: any, next: any) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) return res.status(401).json({ error: 'Missing auth token' });
+
+  try {
+    const decodedToken = await getAuth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+}
 
 // Initialize VAPID Keys
 const VAPID_KEYS_FILE = path.join(process.cwd(), 'vapidKeys.json');
@@ -246,6 +296,30 @@ app.post('/api/ai/chat', async (req, res) => {
     console.error("AI Chat error:", error);
     res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
     res.end();
+  }
+});
+
+app.post('/api/tokens/encrypt', authenticateToken, (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+    const encrypted = encrypt(token);
+    res.json({ encrypted });
+  } catch (err) {
+    console.error('Encryption failed:', err);
+    res.status(500).json({ error: 'Encryption failed' });
+  }
+});
+
+app.post('/api/tokens/decrypt', authenticateToken, (req, res) => {
+  try {
+    const { encrypted } = req.body;
+    if (!encrypted) return res.status(400).json({ error: 'Encrypted token is required' });
+    const token = decrypt(encrypted);
+    res.json({ token });
+  } catch (err) {
+    console.error('Decryption failed:', err);
+    res.status(500).json({ error: 'Decryption failed' });
   }
 });
 

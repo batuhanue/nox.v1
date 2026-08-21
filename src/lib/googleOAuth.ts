@@ -140,6 +140,47 @@ export async function handleConnectCalendar(currentUser?: User | null): Promise<
 }
 
 /**
+ * Encrypt a token via the backend service
+ */
+export async function encryptToken(token: string, firebaseUser: User): Promise<string> {
+  const idToken = await firebaseUser.getIdToken();
+  const res = await fetch('/api/tokens/encrypt', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ token })
+  });
+  if (!res.ok) throw new Error('Token şifreleme başarısız oldu');
+  const data = await res.json();
+  return data.encrypted;
+}
+
+/**
+ * Decrypt a token via the backend service
+ */
+export async function decryptToken(encryptedToken: string, firebaseUser: User): Promise<string> {
+  // Simple check: if it doesn't look like our IV:encrypted string, it might be an old plaintext token
+  if (!encryptedToken.includes(':') || encryptedToken.length < 32) {
+    return encryptedToken;
+  }
+  
+  const idToken = await firebaseUser.getIdToken();
+  const res = await fetch('/api/tokens/decrypt', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ encrypted: encryptedToken })
+  });
+  if (!res.ok) throw new Error('Token çözme başarısız oldu');
+  const data = await res.json();
+  return data.token;
+}
+
+/**
  * 3. Dedicated Gmail Authorization
  * Requests only Gmail readonly scope for an already authenticated Firebase user.
  */
